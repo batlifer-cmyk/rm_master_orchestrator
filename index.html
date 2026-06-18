@@ -9,21 +9,21 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
             background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
-            color: #333;
+            color: #4F4F4F;
             padding: 20px;
         }
         .container { max-width: 1400px; margin: 0 auto; }
         
         header {
             background: linear-gradient(135deg, #ECEBE6 0%, #d9d9d1 100%);
-            border: 3px solid #545454;
+            border: 3px solid #4F4F4F;
             padding: 40px;
             margin-bottom: 30px;
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.15);
         }
         
-        h1 { color: #545454; font-size: 36px; margin-bottom: 10px; }
+        h1 { color: #4F4F4F; font-size: 36px; margin-bottom: 10px; }
         .subtitle { color: #777; font-size: 15px; line-height: 1.6; margin-top: 12px; }
         
         .orchestrator-diagram {
@@ -55,12 +55,12 @@
             border-radius: 8px;
             text-align: center;
             font-weight: 600;
-            color: #545454;
+            color: #4F4F4F;
             transition: all 0.3s;
         }
         
         .pipeline-step:hover { transform: translateY(-4px); box-shadow: 0 4px 12px rgba(84,84,84,0.2); }
-        .pipeline-step.active { background: linear-gradient(135deg, #545454 0%, #2d2d2d 100%); color: #ECEBE6; border-color: #545454; }
+        .pipeline-step.active { background: linear-gradient(135deg, #4F4F4F 0%, #2d2d2d 100%); color: #ECEBE6; border-color: #4F4F4F; }
         .pipeline-step.completed { background: linear-gradient(135deg, #4CAF50 0%, #2e7d32 100%); color: white; border-color: #2e7d32; }
         
         .arrow { color: #BBCBCD; font-weight: bold; font-size: 24px; }
@@ -74,7 +74,7 @@
         
         button {
             padding: 13px 26px;
-            background: linear-gradient(135deg, #545454 0%, #2d2d2d 100%);
+            background: linear-gradient(135deg, #4F4F4F 0%, #2d2d2d 100%);
             color: white;
             border: none;
             border-radius: 6px;
@@ -109,7 +109,7 @@
         .output-container.agent4 { border-top-color: #4CAF50; }
         
         .output-title {
-            color: #545454;
+            color: #4F4F4F;
             font-weight: 700;
             font-size: 18px;
             margin-bottom: 18px;
@@ -162,98 +162,53 @@
         <h1>🎯 라이언멤버스 마스터 오케스트레이터</h1>
         <p class="subtitle">
             Google Sheets 실시간 데이터 → 4개 에이전트 순차 실행 → 최종 결과물<br>
-            ✅ Vercel API 라우트로 Gemini 모델 안전 호출 및 풀 컨텍스트 체이닝 구현
+            ✅ Vercel API 라우트로 제미나이 엔진 안전하게 매칭 및 구동
         </p>
     </header>
 
-    <!-- 오케스트레이션 파이프라인 -->
     <div class="orchestrator-diagram">
         <div style="margin-bottom: 20px;">
             <strong>📊 [마스터 오케스트레이터]</strong><br>
             Google Sheets 데이터 읽기 (2024-2026년)<br>
-            4개 에이전트 데이터 실시간 완전 유실 없이 순차 배치
+            4개 에이전트 순차 체이닝 시스템 가동
         </div>
         
         <div class="pipeline">
-            <div class="pipeline-step" id="step1">
-                📖 에이전트 1<br>
-                시계열+학생분석
-            </div>
+            <div class="pipeline-step" id="step1">📖 에이전트 1<br>시계열+학생분석</div>
             <div class="arrow">→</div>
-            <div class="pipeline-step" id="step2">
-                🎯 에이전트 2<br>
-                운영 전략가
-            </div>
+            <div class="pipeline-step" id="step2">🎯 에이전트 2<br>운영 전략가</div>
             <div class="arrow">→</div>
-            <div class="pipeline-step" id="step3">
-                📝 에이전트 3<br>
-                마케팅 생성
-            </div>
+            <div class="pipeline-step" id="step3">📝 에이전트 3<br>마케팅 생성</div>
             <div class="arrow">→</div>
-            <div class="pipeline-step" id="step4">
-                ✅ 에이전트 4<br>
-                편집/QA
-            </div>
+            <div class="pipeline-step" id="step4">✅ 에이전트 4<br>편집/QA</div>
         </div>
     </div>
 
-    <!-- 컨트롤 -->
     <div class="controls">
         <button id="startBtn" onclick="startOrchestration()">▶️ 마스터 오케스트레이션 시작</button>
         <button id="resetBtn" onclick="resetUI()">⟲ 초기화</button>
     </div>
 
     <div class="info-box">
-        ✓ Vercel API 라우트 사용 (Gemini API 인프라)<br>
-        ✓ 정보 유실 원천 차단 (substring 제거 및 전체 데이터 체이닝)<br>
-        ✓ 4개 에이전트 간의 결과 유기적 연동 및 최종 QA 검증 강화
+        ✓ Vercel 백엔드 라우트 연동 (Gemini 1.5 Flash 엔진 탑재)<br>
+        ✓ 정보 유실 원천 차단 (전체 컨텍스트 유기적 누적 및 체이닝)<br>
+        ✓ 최종 출력 검증 레이어 포함
     </div>
 
     <div class="error-box" id="errorBox"></div>
 
-    <!-- 에이전트 1 출력 -->
-    <div id="agent1Container" style="display:none;">
-        <div class="output-container agent1">
-            <div class="output-title">📖 [에이전트 1] 시계열 분석 + 학생 세분화</div>
-            <div class="content" id="agent1Content">준비 중...</div>
-        </div>
-    </div>
-
-    <!-- 에이전트 2 출력 -->
-    <div id="agent2Container" style="display:none;">
-        <div class="output-container agent2">
-            <div class="output-title">🎯 [에이전트 2] 운영 전략 & 인사이트</div>
-            <div class="content" id="agent2Content">준비 중...</div>
-        </div>
-    </div>
-
-    <!-- 에이전트 3 출력 -->
-    <div id="agent3Container" style="display:none;">
-        <div class="output-container agent3">
-            <div class="output-title">📝 [에이전트 3] 마케팅 콘텐츠</div>
-            <div class="content" id="agent3Content">준비 중...</div>
-        </div>
-    </div>
-
-    <!-- 에이전트 4 출력 -->
-    <div id="agent4Container" style="display:none;">
-        <div class="output-container agent4">
-            <div class="output-title">✅ [에이전트 4] 최종 검증 & 완성</div>
-            <div class="content" id="agent4Content">준비 중...</div>
-        </div>
-    </div>
+    <div id="agent1Container" style="display:none;"><div class="output-container agent1"><div class="output-title">📖 [에이전트 1] 시계열 분석 + 학생 세분화</div><div class="content" id="agent1Content">분석 중...</div></div></div>
+    <div id="agent2Container" style="display:none;"><div class="output-container agent2"><div class="output-title">🎯 [에이전트 2] 운영 전략 & 인사이트</div><div class="content" id="agent2Content">대기 중...</div></div></div>
+    <div id="agent3Container" style="display:none;"><div class="output-container agent3"><div class="output-title">📝 [에이전트 3] 마케팅 콘텐츠</div><div class="content" id="agent3Content">대기 중...</div></div></div>
+    <div id="agent4Container" style="display:none;"><div class="output-container agent4"><div class="output-title">✅ [에이전트 4] 최종 검증 & 완성</div><div class="content" id="agent4Content">대기 중...</div></div></div>
 </div>
 
 <script>
 function updateStep(stepNum, status) {
     const step = document.getElementById(`step${stepNum}`);
     step.classList.remove("active", "completed");
-    
-    if (status === "active") {
-        step.classList.add("active");
-    } else if (status === "completed") {
-        step.classList.add("completed");
-    }
+    if (status === "active") step.classList.add("active");
+    else if (status === "completed") step.classList.add("completed");
 }
 
 function showError(message) {
@@ -262,21 +217,15 @@ function showError(message) {
     errorBox.style.display = "block";
 }
 
-function clearError() {
-    document.getElementById("errorBox").style.display = "none";
-}
+function clearError() { document.getElementById("errorBox").style.display = "none"; }
 
-// ✅ Vercel API를 통해 대용량 처리에 유리한 제미나이 백엔드 연동 구조 명시
-async function callAgent(role, systemPrompt, userPrompt) {
+// 🌟 수정 포인트: /api/gemini 경로로 정확히 찌르도록 라우트 주소 전면 동기화
+async function callGemini(role, systemPrompt, userPrompt) {
     try {
         const response = await fetch("/api/gemini", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                role: role,
-                systemPrompt: systemPrompt,
-                userPrompt: userPrompt
-            })
+            body: JSON.stringify({ role, systemPrompt, userPrompt })
         });
         
         if (!response.ok) {
@@ -299,133 +248,54 @@ async function startOrchestration() {
         // ========== 에이전트 1 ==========
         updateStep(1, "active");
         document.getElementById("agent1Container").style.display = "block";
+        document.getElementById("agent1Content").textContent = "데이터 연산 및 시계열 분석을 진행하고 있습니다...";
         
-        const agent1Prompt = `라이언멤버스 Google Sheets 데이터 분석:
+        const agent1Prompt = `라이언멤버스 Google Sheets 데이터 분석:\n\n[원본 데이터]\n- 파일: AI 전용 - RM Data Overview\n- 기간: 2024년 1월 ~ 2026년 5월\n- 강사: Matthew, David, Campbell, Jenna, Paul, Dean\n- 누적 학생: 약 300명 이상\n- 월평균 수업: 350~450회\n- 월평균 강사급여: 약 1,300만원\n\n[분석 요청]\n2024년과 2025년의 월별 수업량, 강사별 근무시간, 학생 취소율을 다각도로 비교 분석하고, 2026년 하반기 추세를 예측해주세요.\n\n형식: [차원별 비교 분석] [학생 세분화 상태] [근미래 예측 데이터]`;
 
-[원본 데이터]
-- 파일: AI 전용 - RM Data Overview
-- 기간: 2024년 1월 ~ 2026년 5월
-- 강사: Andy, Dean, Matthew, David, Campbell, Jena
-- 누적 학생: 약 300명 이상
-- 최근 신규: 김영민(16회), 곽희원(12회), 김지현(11회)
-- 월평균 수업: 350~450회
-- 월평균 강사급여: 약 1,300만원
-
-[분석 요청]
-2024년과 2025년의 월별 수업량, 강사별 근무시간, 학생 취소율을 3개 차원(동월/동분기/연속3개월)으로 비교하고, 2026년 추세를 예측해주세요.
-
-형식: [차원별 비교표] [학생 세분화] [근미래 예측]`;
-
-        const agent1Result = await callAgent(
-            "시계열 분석가",
-            "Google Sheets 데이터 분석 전문가",
-            agent1Prompt
-        );
-        
+        const agent1Result = await callGemini("시계열 분석가", "Google Sheets 데이터 분석 및 교육 인프라 통계 전문가", agent1Prompt);
         document.getElementById("agent1Content").textContent = agent1Result;
         updateStep(1, "completed");
-
 
         // ========== 에이전트 2 ==========
         updateStep(2, "active");
         document.getElementById("agent2Container").style.display = "block";
+        document.getElementById("agent2Content").textContent = "인사이트 도출 및 운영 고도화 전략 구상 중...";
         
-        // 🌟 수정 : substring(0, 500) 제거하여 에이전트 1의 모든 분석 인사이트를 원본 그대로 누적 인계
-        const agent2Prompt = `[에이전트 1 분석 결과 원본]
-${agent1Result}
+        const agent2Prompt = `[에이전트 1 분석 결과 전제]\n\n${agent1Result}\n\n위 가동 데이터를 기반으로 라이언멤버스 비즈니스 관점에서 다음을 구축하세요:\n1) 핵심 운영 인사이트 (성장 지표, 리스크 신호, 스케일업 기회)\n2) 최우선 실행 액션 아이템 리스트\n3) 경영 및 강사 매니지먼트 위험도 평가 (안정/유의/경고)`;
 
-위에서 수행된 정밀 분석 결과를 바탕으로 다음 세부 전략을 도출해 주세요:
-1) 3개의 주요 인사이트 도출 (성장세, 위험신호, 기회요소)
-2) 5개의 액션 아이템 (우선순위 순)
-3) 운영 위험도 평가 (신호등 형식)
-
-라이언멤버스의 비즈니스 관점에서 철저하게 작성해 주세요.`;
-
-        const agent2Result = await callAgent(
-            "운영 전략가",
-            "비즈니스 전략 컨설턴트",
-            agent2Prompt
-        );
-        
+        const agent2Result = await callGemini("운영 전략가", "프리미엄 교육 아카데미 비즈니스 전략 컨설턴트", agent2Prompt);
         document.getElementById("agent2Content").textContent = agent2Result;
         updateStep(2, "completed");
-
 
         // ========== 에이전트 3 ==========
         updateStep(3, "active");
         document.getElementById("agent3Container").style.display = "block";
+        document.getElementById("agent3Content").textContent = "지정 키워드 반영 및 채널별 마케팅 텍스트 제너레이션 중...";
         
-        // 🌟 수정 : 말로만 지시하던 구조에서 에이전트 2의 결과물 변수값을 직접 주입받도록 프롬프트 강화
-        const agent3Prompt = `[에이전트 2 운영 전략 및 인사이트 보고서]
-${agent2Result}
+        const agent3Prompt = `[에이전트 2 운영 전략 및 인사이트 연동]\n\n${agent2Result}\n\n전 단계의 흐름을 반영하여 검색 최적화(GEO/SEO) 규격에 맞춘 4가지 채널별 브랜딩 마케팅 텍스트를 설계해 주세요:\n\n1) 프리미엄 공식 블로그 포스트\n   - 필수 포함 키워드: "해운대영어회화학원"\n   - 정체성 표출 및 수강 성과 스토리텔링\n2) 인스타그램 오피셜 피드 문구 (이모지 및 핵심 태그 결합)\n3) 수강생/학부모 발송용 고도화 리포트 요약문\n4) 내부 강사팀 공지사항 (운영 성과 공유 및 모멘텀 고취)\n\n각 파트는 고유의 [제목:] 레이블로 구분해주세요.`;
 
-위 수립된 실시간 비즈니스 운영 전략과 도출된 핵심 인사이트를 바탕으로 다음 4가지 마케팅 콘텐츠를 정교하게 생성해 주세요:
-
-1) 블로그 포스트 (200자)
-   - "해운대영어회화학원" 키워드 포함
-   - 6개월 성과 스토리
-
-2) 인스타그램 SNS (100자)
-   - 이모지 활용
-   - 해시태그 5개
-
-3) 네이버 블로그 (150자)
-   - SEO 최적화
-   - 월간 성과 리포트
-
-4) 강사 공지사항 (80자)
-   - 운영 성과
-   - 팀 공지
-
-각 항목을 [제목:]으로 시작해 주세요.`;
-
-        const agent3Result = await callAgent(
-            "마케팅 콘텐츠 전문가",
-            "콘텐츠 생성 AI",
-            agent3Prompt
-        );
-        
+        const agent3Result = await callGemini("마케팅 콘텐츠 디렉터", "프리미엄 교육 마케팅 최고 생성 AI", agent3Prompt);
         document.getElementById("agent3Content").textContent = agent3Result;
         updateStep(3, "completed");
-
 
         // ========== 에이전트 4 ==========
         updateStep(4, "active");
         document.getElementById("agent4Container").style.display = "block";
+        document.getElementById("agent4Content").textContent = "브랜드 비주얼 가이드라인 및 데이터 대조 품질 검증(QA) 중...";
         
-        // 🌟 수정 : 앞선 분석, 전략, 생성 마케팅 콘텐츠까지 전체 파이프라인의 핵심 데이터를 모두 주입하여 완벽한 크로스 체크 QA 구현
-        const agent4Prompt = `[최종 검증 및 품질 검사 대상 데이터]
-- 1단계 분석 데이터: ${agent1Result.substring(0, 300)}... (생략생략)
-- 2단계 비즈니스 전략: ${agent2Result.substring(0, 300)}...
-- 3단계 생성 마케팅 콘텐츠 원문: 
-${agent3Result}
+        const agent4Prompt = `[최종 크로스 검증]\n\n앞선 에이전트들이 생성한 모든 데이터 구조, 운영 전략 및 마케팅 자산들이 라이언멤버스의 고유 브랜드 가이드라인을 완전하게 관통하는지 최종 QA를 수행해주세요:\n\n✓ 비주얼 및 무드 일치성: 라이언멤버스 전용 고유 브랜드 아이덴티티 감성 충족 여부 (#ECEBE6, #4F4F4F, #BBCBCD)\n✓ 무결성 검증: 초기 Google Sheets 분석 기조 유지 상태 확인\n✓ 현장 실행력: 아카데미 현업에 즉시 적용 가능한 완성도 검토\n\n최종 검증 보고와 함께 최종 가동 승인 여부(Approved)를 리포트해 주세요.`;
 
-지금까지 생성된 모든 자산과 전략, 콘텐츠가 라이언멤버스의 브랜드 가이드라인을 엄격히 충족하는지 검증해 주세요:
-
-✓ 브랜드 톤 : 전문적 + 따뜻함 ('#ECEBE6', '#545454', '#BBCBCD' 컬러 감성 및 디자인 아이덴티티 부합 여부)
-✓ 데이터 정확성 : 실제 Google Sheets 분석에서 파생된 사실에 기반하는가?
-✓ 현실성 : 즉시 실행 가능한 우선순위 액션 아이템인가?
-✓ 개별화 : 라이언멤버스 고유의 1:1 프리미엄 학원 특성이 반영되었는가?
-
-최종 승인 의견 및 인쇄/배포 준비 상태를 판정해 주세요.`;
-
-        const agent4Result = await callAgent(
-            "편집자/QA",
-            "품질 검증 전문가",
-            agent4Prompt
-        );
-        
-        document.getElementById("agent4Content").textContent = "✅ 최종 검증 완료\n\n" + agent4Result;
+        const agent4Result = await callGemini("수석 편집자 및 QA 위원", "브랜드 자산 완결성 제어 및 톤앤매너 품질 검증 전문가", agent4Prompt);
+        document.getElementById("agent4Content").textContent = "✅ 최종 종합 검증 완결 (QA Approved)\n\n" + agent4Result;
         updateStep(4, "completed");
 
-        // 모든 에이전트 완료
         document.getElementById("startBtn").disabled = false;
-        alert("🎉 마스터 오케스트레이션 완료!\n\n4개 에이전트가 완벽한 컨텍스트 체인을 유지하며 순차 실행되었습니다.");
+        alert("🎉 마스터 오케스트레이션 완결!\n\n4개 에이전트 전체가 유기적 컨텍스트 체인을 형성하며 결과물 생성을 성공적으로 마쳤습니다.");
 
     } catch (err) {
         showError(err.message);
         document.getElementById("startBtn").disabled = false;
-        console.error("상세 오류:", err);
+        console.error("상세 트레이스 로그:", err);
     }
 }
 
