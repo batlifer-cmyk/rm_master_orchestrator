@@ -152,6 +152,17 @@
             color: #1565c0;
         }
         
+        .error-box {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+            padding: 16px;
+            margin: 16px 0;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #c62828;
+            display: none;
+        }
+        
         @media (max-width: 1000px) {
             .pipeline { flex-direction: column; }
             .arrow { display: none; }
@@ -164,7 +175,7 @@
         <h1>🎯 라이언멤버스 마스터 오케스트레이터</h1>
         <p class="subtitle">
             Google Sheets 실시간 데이터 → 4개 에이전트 순차 실행 → 최종 결과물<br>
-            이미지의 구조를 정확히 구현: 마스터가 Google Sheets에서 데이터를 읽고 4개 에이전트에 순차 배치
+            ✅ Vercel API 라우트로 API 키 안전하게 관리
         </p>
     </header>
 
@@ -206,11 +217,13 @@
     </div>
 
     <div class="info-box">
-        ✓ Google Sheets (2024-2026년 전체 데이터) 자동 읽음<br>
-        ✓ 마스터 오케스트레이터가 데이터를 4개 에이전트에 순차 배치<br>
-        ✓ 각 에이전트의 결과 → 다음 에이전트가 참고<br>
-        ✓ 최종 결과물 Google Drive에 자동 저장
+        ✓ Vercel API 라우트 사용 (API 키 안전)<br>
+        ✓ Google Sheets (2024-2026년) 자동 읽음<br>
+        ✓ 4개 에이전트 순차 실행<br>
+        ✓ 각 에이전트 결과 → 다음 에이전트 참고
     </div>
+
+    <div class="error-box" id="errorBox"></div>
 
     <!-- 에이전트 1 출력 -->
     <div id="agent1Container" style="display:none;">
@@ -246,24 +259,6 @@
 </div>
 
 <script>
-// Google Sheets 데이터 (이미 읽은 데이터를 기반으로)
-const sheetsData = {
-    sheetName: "AI 전용 - RM Data Overview",
-    period: "2024-2026년",
-    teachers: ["Andy", "Dean", "Matthew", "David", "Campbell", "Jena"],
-    students: "약 300명 이상",
-    dataPoints: {
-        "2024년": "완전 데이터 (Jan-Dec)",
-        "2025년": "완전 데이터 (Jan-Nov)",
-        "2026년": "부분 데이터 (Jan-May)"
-    },
-    recentData: {
-        newStudents: ["김영민 (Sep 16, 16회)", "곽희원 (Oct 29, 12회)", "김지현 (Nov 25, 11회)"],
-        monthlyClasses: "350~450회",
-        avgSalary: "약 1,300만원/월"
-    }
-};
-
 function updateStep(stepNum, status) {
     const step = document.getElementById(`step${stepNum}`);
     step.classList.remove("active", "completed");
@@ -275,23 +270,36 @@ function updateStep(stepNum, status) {
     }
 }
 
+function showError(message) {
+    const errorBox = document.getElementById("errorBox");
+    errorBox.textContent = `❌ ${message}`;
+    errorBox.style.display = "block";
+}
+
+function clearError() {
+    document.getElementById("errorBox").style.display = "none";
+}
+
+// ✅ Vercel API 라우트로 호출 (API 키는 서버에서만 사용)
 async function callClaude(role, systemPrompt, userPrompt) {
     try {
-        const response = await fetch("https://api.anthropic.com/v1/messages", {
+        const response = await fetch("/api/claude", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                model: "claude-sonnet-4-20250514",
-                max_tokens: 1400,
-                messages: [{ 
-                    role: "user", 
-                    content: `[${role}]\n\n${systemPrompt}\n\n${userPrompt}` 
-                }]
+                role: role,
+                systemPrompt: systemPrompt,
+                userPrompt: userPrompt
             })
         });
-        if (!response.ok) throw new Error(`API 오류: ${response.status}`);
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `API 오류: ${response.status}`);
+        }
+        
         const data = await response.json();
-        return data.content[0].text;
+        return data.text;
     } catch (err) {
         throw err;
     }
@@ -299,6 +307,7 @@ async function callClaude(role, systemPrompt, userPrompt) {
 
 async function startOrchestration() {
     document.getElementById("startBtn").disabled = true;
+    clearError();
     
     try {
         // ========== 에이전트 1 ==========
@@ -415,16 +424,18 @@ ${agent1Result.substring(0, 500)}
 
         // 모든 에이전트 완료
         document.getElementById("startBtn").disabled = false;
-        alert("🎉 마스터 오케스트레이션 완료!\n\n4개 에이전트가 순차 실행되어 최종 결과물이 생성되었습니다.\n\n(실제 환경에서는 Google Drive에 자동 저장)");
+        alert("🎉 마스터 오케스트레이션 완료!\n\n4개 에이전트가 순차 실행되어 최종 결과물이 생성되었습니다.");
 
     } catch (err) {
-        alert(`오류: ${err.message}`);
+        showError(err.message);
         document.getElementById("startBtn").disabled = false;
+        console.error("상세 오류:", err);
     }
 }
 
 function resetUI() {
     document.getElementById("startBtn").disabled = false;
+    clearError();
     ["agent1Container", "agent2Container", "agent3Container", "agent4Container"].forEach(id => {
         document.getElementById(id).style.display = "none";
     });
