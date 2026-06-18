@@ -11,8 +11,8 @@ export default async function handler(req, res) {
             return res.status(500).json({ error: 'API Key가 Vercel 환경변수에 설정되지 않았습니다.' });
         }
 
-        // 🌟 수정 : 구형 모델 주소를 최신 gemini-1.5-flash 모델로 변경하여 속도와 안정성 확보
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+      // 주소에서 v1beta 경로와 모델명 지정 방식을 가장 표준적인 형태로 수정합니다.
+const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
         const response = await fetch(url, {
             method: "POST",
