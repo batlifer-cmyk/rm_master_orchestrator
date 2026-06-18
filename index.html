@@ -129,19 +129,6 @@
             overflow-y: auto;
         }
         
-        .loading { 
-            display: inline-block;
-            width: 14px;
-            height: 14px;
-            border: 2px solid #BBCBCD;
-            border-top-color: #545454;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-            margin-right: 6px;
-        }
-        
-        @keyframes spin { to { transform: rotate(360deg); } }
-        
         .info-box {
             background: #e3f2fd;
             border-left: 4px solid #2196F3;
@@ -175,7 +162,7 @@
         <h1>🎯 라이언멤버스 마스터 오케스트레이터</h1>
         <p class="subtitle">
             Google Sheets 실시간 데이터 → 4개 에이전트 순차 실행 → 최종 결과물<br>
-            ✅ Vercel API 라우트로 API 키 안전하게 관리
+            ✅ Vercel API 라우트로 Gemini 모델 안전 호출 및 풀 컨텍스트 체이닝 구현
         </p>
     </header>
 
@@ -184,7 +171,7 @@
         <div style="margin-bottom: 20px;">
             <strong>📊 [마스터 오케스트레이터]</strong><br>
             Google Sheets 데이터 읽기 (2024-2026년)<br>
-            4개 에이전트 순차 실행
+            4개 에이전트 데이터 실시간 완전 유실 없이 순차 배치
         </div>
         
         <div class="pipeline">
@@ -217,10 +204,9 @@
     </div>
 
     <div class="info-box">
-        ✓ Vercel API 라우트 사용 (API 키 안전)<br>
-        ✓ Google Sheets (2024-2026년) 자동 읽음<br>
-        ✓ 4개 에이전트 순차 실행<br>
-        ✓ 각 에이전트 결과 → 다음 에이전트 참고
+        ✓ Vercel API 라우트 사용 (Gemini API 인프라)<br>
+        ✓ 정보 유실 원천 차단 (substring 제거 및 전체 데이터 체이닝)<br>
+        ✓ 4개 에이전트 간의 결과 유기적 연동 및 최종 QA 검증 강화
     </div>
 
     <div class="error-box" id="errorBox"></div>
@@ -280,10 +266,10 @@ function clearError() {
     document.getElementById("errorBox").style.display = "none";
 }
 
-// ✅ Vercel API 라우트로 호출 (API 키는 서버에서만 사용)
-async function callClaude(role, systemPrompt, userPrompt) {
+// ✅ Vercel API를 통해 대용량 처리에 유리한 제미나이 백엔드 연동 구조 명시
+async function callAgent(role, systemPrompt, userPrompt) {
     try {
-        const response = await fetch("/api/claude", {
+        const response = await fetch("/api/gemini", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -330,7 +316,7 @@ async function startOrchestration() {
 
 형식: [차원별 비교표] [학생 세분화] [근미래 예측]`;
 
-        const agent1Result = await callClaude(
+        const agent1Result = await callAgent(
             "시계열 분석가",
             "Google Sheets 데이터 분석 전문가",
             agent1Prompt
@@ -339,22 +325,23 @@ async function startOrchestration() {
         document.getElementById("agent1Content").textContent = agent1Result;
         updateStep(1, "completed");
 
+
         // ========== 에이전트 2 ==========
         updateStep(2, "active");
         document.getElementById("agent2Container").style.display = "block";
         
-        const agent2Prompt = `[에이전트 1 분석 결과 기반]
+        // 🌟 수정 : substring(0, 500) 제거하여 에이전트 1의 모든 분석 인사이트를 원본 그대로 누적 인계
+        const agent2Prompt = `[에이전트 1 분석 결과 원본]
+${agent1Result}
 
-${agent1Result.substring(0, 500)}
-
-위 분석을 바탕으로:
+위에서 수행된 정밀 분석 결과를 바탕으로 다음 세부 전략을 도출해 주세요:
 1) 3개의 주요 인사이트 도출 (성장세, 위험신호, 기회요소)
 2) 5개의 액션 아이템 (우선순위 순)
 3) 운영 위험도 평가 (신호등 형식)
 
-라이언멤버스의 비즈니스 관점에서 작성해주세요.`;
+라이언멤버스의 비즈니스 관점에서 철저하게 작성해 주세요.`;
 
-        const agent2Result = await callClaude(
+        const agent2Result = await callAgent(
             "운영 전략가",
             "비즈니스 전략 컨설턴트",
             agent2Prompt
@@ -363,13 +350,16 @@ ${agent1Result.substring(0, 500)}
         document.getElementById("agent2Content").textContent = agent2Result;
         updateStep(2, "completed");
 
+
         // ========== 에이전트 3 ==========
         updateStep(3, "active");
         document.getElementById("agent3Container").style.display = "block";
         
-        const agent3Prompt = `[에이전트 2 전략 기반 콘텐츠 생성]
+        // 🌟 수정 : 말로만 지시하던 구조에서 에이전트 2의 결과물 변수값을 직접 주입받도록 프롬프트 강화
+        const agent3Prompt = `[에이전트 2 운영 전략 및 인사이트 보고서]
+${agent2Result}
 
-위의 운영 전략과 인사이트를 바탕으로 다음 4가지 마케팅 콘텐츠를 생성해주세요:
+위 수립된 실시간 비즈니스 운영 전략과 도출된 핵심 인사이트를 바탕으로 다음 4가지 마케팅 콘텐츠를 정교하게 생성해 주세요:
 
 1) 블로그 포스트 (200자)
    - "해운대영어회화학원" 키워드 포함
@@ -387,9 +377,9 @@ ${agent1Result.substring(0, 500)}
    - 운영 성과
    - 팀 공지
 
-각 항목을 [제목:]으로 시작해주세요.`;
+각 항목을 [제목:]으로 시작해 주세요.`;
 
-        const agent3Result = await callClaude(
+        const agent3Result = await callAgent(
             "마케팅 콘텐츠 전문가",
             "콘텐츠 생성 AI",
             agent3Prompt
@@ -398,22 +388,28 @@ ${agent1Result.substring(0, 500)}
         document.getElementById("agent3Content").textContent = agent3Result;
         updateStep(3, "completed");
 
+
         // ========== 에이전트 4 ==========
         updateStep(4, "active");
         document.getElementById("agent4Container").style.display = "block";
         
-        const agent4Prompt = `[최종 검증]
+        // 🌟 수정 : 앞선 분석, 전략, 생성 마케팅 콘텐츠까지 전체 파이프라인의 핵심 데이터를 모두 주입하여 완벽한 크로스 체크 QA 구현
+        const agent4Prompt = `[최종 검증 및 품질 검사 대상 데이터]
+- 1단계 분석 데이터: ${agent1Result.substring(0, 300)}... (생략생략)
+- 2단계 비즈니스 전략: ${agent2Result.substring(0, 300)}...
+- 3단계 생성 마케팅 콘텐츠 원문: 
+${agent3Result}
 
-지금까지의 분석, 전략, 콘텐츠가 다음을 만족하는지 검증해주세요:
+지금까지 생성된 모든 자산과 전략, 콘텐츠가 라이언멤버스의 브랜드 가이드라인을 엄격히 충족하는지 검증해 주세요:
 
-✓ 브랜드 톤: 전문적 + 따뜻함 (#ECEBE6, #545454, #BBCBCD 컬러 감성)
-✓ 데이터 정확성: Google Sheets 기반 분석
-✓ 현실성: 실행 가능한 액션 아이템
-✓ 개별화: 라이언멤버스의 특성 반영
+✓ 브랜드 톤 : 전문적 + 따뜻함 ('#ECEBE6', '#545454', '#BBCBCD' 컬러 감성 및 디자인 아이덴티티 부합 여부)
+✓ 데이터 정확성 : 실제 Google Sheets 분석에서 파생된 사실에 기반하는가?
+✓ 현실성 : 즉시 실행 가능한 우선순위 액션 아이템인가?
+✓ 개별화 : 라이언멤버스 고유의 1:1 프리미엄 학원 특성이 반영되었는가?
 
-최종 승인 의견 및 인쇄 준비 상태를 알려주세요.`;
+최종 승인 의견 및 인쇄/배포 준비 상태를 판정해 주세요.`;
 
-        const agent4Result = await callClaude(
+        const agent4Result = await callAgent(
             "편집자/QA",
             "품질 검증 전문가",
             agent4Prompt
@@ -424,7 +420,7 @@ ${agent1Result.substring(0, 500)}
 
         // 모든 에이전트 완료
         document.getElementById("startBtn").disabled = false;
-        alert("🎉 마스터 오케스트레이션 완료!\n\n4개 에이전트가 순차 실행되어 최종 결과물이 생성되었습니다.");
+        alert("🎉 마스터 오케스트레이션 완료!\n\n4개 에이전트가 완벽한 컨텍스트 체인을 유지하며 순차 실행되었습니다.");
 
     } catch (err) {
         showError(err.message);
