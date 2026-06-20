@@ -1,4 +1,4 @@
-export default async function handler(req, res) {
+async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
     }
@@ -11,7 +11,7 @@ export default async function handler(req, res) {
             return res.status(500).json({ error: 'API Key가 Vercel 환경변수에 설정되지 않았습니다.' });
         }
 
-        // 🌟 주소를 구글 정식 안정 버전인 v1으로 타겟팅하여 버전 비호환 에러를 차단합니다.
+        // 구글 정식 v1 안정화 버전 엔드포인트 타겟팅
         const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
         const response = await fetch(url, {
@@ -43,10 +43,5 @@ export default async function handler(req, res) {
     }
 }
 
-export const config = {
-    api: {
-        bodyParser: {
-            sizeLimit: '4.5mb',
-        },
-    },
-};
+// 버셀 커먼JS 컴파일러가 인식할 수 있도록 모듈 익스포트 방식을 정렬합니다.
+module.exports = handler;
