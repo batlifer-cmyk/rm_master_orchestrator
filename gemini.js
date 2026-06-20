@@ -11,7 +11,8 @@ export default async function handler(req, res) {
             return res.status(500).json({ error: 'API Key가 Vercel 환경변수에 설정되지 않았습니다.' });
         }
 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+        // 🌟 주소를 구글 정식 안정 버전인 v1으로 타겟팅하여 버전 비호환 에러를 차단합니다.
+        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
         const response = await fetch(url, {
             method: "POST",
@@ -42,7 +43,6 @@ export default async function handler(req, res) {
     }
 }
 
-// 🌟 여기에 용량 제한 해제 설정이 추가되었습니다.
 export const config = {
     api: {
         bodyParser: {
