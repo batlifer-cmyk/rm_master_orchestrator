@@ -1,4 +1,4 @@
-export const config = { maxDuration: 60 };
+export const config = { maxDuration: 300 };
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-5.5';
 const MAX_PROMPT_LENGTH = 120_000;
@@ -91,9 +91,11 @@ export default async function handler(req, res) {
         model: MODEL,
         instructions: systemPrompt || '정확한 수치와 근거를 우선하는 한국어 비즈니스 분석가입니다.',
         input,
-        max_output_tokens: 6000,
+        reasoning: { effort: 'none' },
+        text: { verbosity: 'medium' },
+        max_output_tokens: 3000,
       }),
-      signal: AbortSignal.timeout(55_000),
+      signal: AbortSignal.timeout(280_000),
     });
     const data = await response.json();
 
