@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RM Google Sheets AI 분석</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; background: #ecebe6; color: #4f4f4f; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .container { max-width: 1320px; margin: auto; }
+    header, .input-section, .pipeline, .output { background: #f7f6f3; border: 2px solid #4f4f4f; border-radius: 8px; padding: 28px; margin-bottom: 22px; }
+    h1 { margin: 0 0 10px; font-size: 28px; }
+    p { line-height: 1.6; }
+    label { display: block; margin-bottom: 12px; font-weight: 700; }
+    textarea { width: 100%; min-height: 150px; padding: 16px; border: 1px solid #bbcbd0; border-radius: 5px; font: inherit; line-height: 1.6; resize: vertical; }
+    .examples { margin-top: 12px; color: #666; font-size: 14px; }
+    .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .step { padding: 18px 10px; border: 2px solid #bbcbd0; border-radius: 6px; text-align: center; font-weight: 700; }
+    .step.active { color: white; background: #4f4f4f; border-color: #4f4f4f; }
+    .step.done { background: #bbcbd0; }
+    button { padding: 14px 24px; border: 0; border-radius: 5px; background: #4f4f4f; color: white; font-size: 15px; font-weight: 700; cursor: pointer; }
+    button:disabled { opacity: .5; cursor: wait; }
+    .actions { display: flex; gap: 10px; margin-bottom: 22px; }
+    .output { display: none; border-top-width: 5px; }
+    .output h2 { margin-top: 0; font-size: 18px; }
+    .content { white-space: pre-wrap; line-height: 1.75; background: white; border-radius: 5px; padding: 18px; max-height: 600px; overflow: auto; }
+    .error { display: none; padding: 16px; margin-bottom: 20px; border-left: 5px solid #d32f2f; background: #ffebee; color: #b71c1c; }
+    @media (max-width: 800px) { .steps { grid-template-columns: 1fr 1fr; } body { padding: 12px; } }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>RM Google Sheets AI 분석</h1>
+      <p>비공개 <strong>Master Time Data</strong>를 자동으로 읽어 기간별 수업 운영 추이를 계산하고 전략 리포트를 작성합니다.</p>
+    </header>
+
+    <section class="input-section">
+      <label for="question">분석 질문</label>
+      <textarea id="question" placeholder="예: 2026년 6월과 2025년, 2024년 6월의 수업량·학생 수·강사료 추이를 비교하고 2026년 7월 광고전략을 세워줘."></textarea>
+      <div class="examples">데이터를 붙여 넣지 않아도 됩니다. 원하는 기간과 비교 지표를 질문으로 작성하세요.</div>
+    </section>
+
+    <section class="pipeline">
+      <div class="steps">
+        <div class="step" id="step1">1. 시트 집계·분석</div>
+        <div class="step" id="step2">2. 운영전략</div>
+        <div class="step" id="step3">3. 광고전략</div>
+        <div class="step" id="step4">4. 최종 QA</div>
+      </div>
+    </section>
+
+    <div class="actions">
+      <button id="start">분석 시작</button>
+      <button id="reset" type="button">초기화</button>
+    </div>
+    <div class="error" id="error"></div>
+
+    <section class="output" id="output1"><h2>시트 집계 및 추이 분석</h2><div class="content" id="content1"></div></section>
+    <section class="output" id="output2"><h2>운영 전략</h2><div class="content" id="content2"></div></section>
+    <section class="output" id="output3"><h2>광고 전략</h2><div class="content" id="content3"></div></section>
+    <section class="output" id="output4"><h2>최종 검증 리포트</h2><div class="content" id="content4"></div></section>
+  </main>
+
+  <script>
+    const startButton = document.getElementById('start');
+    const errorBox = document.getElementById('error');
+
+    function setStep(number, state) {
+      const element = document.getElementById(`step${number}`);
+      element.className = `step ${state}`;
+    }
+
+    function showOutput(number, text) {
+      document.getElementById(`output${number}`).style.display = 'block';
+      document.getElementById(`content${number}`).textContent = text;
+    }
+
+    async function callApi(systemPrompt, userPrompt, includeSheetData = false) {
+      const response = await fetch('/api/gemini', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ systemPrompt, userPrompt, includeSheetData }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || `서버 오류 ${response.status}`);
+      return data.text;
+    }
+
+    startButton.addEventListener('click', async () => {
+      const question = document.getElementById('question').value.trim();
+      if (!question) return alert('분석 질문을 입력해 주세요.');
+      startButton.disabled = true;
+      errorBox.style.display = 'none';
+
+      try {
+        setStep(1, 'active');
+        showOutput(1, 'Google Sheets를 읽고 월별 지표를 계산하고 있습니다...');
+        const analysis = await callApi(
+          '당신은 교육업 운영 데이터 분석가입니다. 제공된 월별 집계만 사용하여 비교 기간의 절대값, 증감값, 증감률을 표로 작성하세요. 존재하지 않는 매출·광고 지표를 추정하지 마세요.',
+          question,
+          true
+        );
+        showOutput(1, analysis); setStep(1, 'done');
+
+        setStep(2, 'active'); showOutput(2, '운영 전략을 작성하고 있습니다...');
+        const operations = await callApi(
+          '당신은 교육업 경영 전략가입니다. 수치 근거를 유지하고 실행 가능한 운영전략을 우선순위별로 작성하세요.',
+          `원래 질문:\n${question}\n\n데이터 분석:\n${analysis}`
+        );
+        showOutput(2, operations); setStep(2, 'done');
+
+        setStep(3, 'active'); showOutput(3, '다음 달 광고 전략을 작성하고 있습니다...');
+        const marketing = await callApi(
+          '당신은 학원 광고 전략가입니다. 제공되지 않은 광고비·ROAS·전환율을 만들지 말고, 확인된 수요 추이에 근거한 채널·타깃·메시지·실행일정을 제안하세요.',
+          `원래 질문:\n${question}\n\n데이터 분석:\n${analysis}\n\n운영 전략:\n${operations}`
+        );
+        showOutput(3, marketing); setStep(3, 'done');
+
+        setStep(4, 'active'); showOutput(4, '수치와 전략의 일관성을 검증하고 있습니다...');
+        const qa = await callApi(
+          '당신은 비즈니스 리포트 QA 책임자입니다. 수치 왜곡, 근거 없는 주장, 실행상 충돌을 검사하고 수정된 최종 요약과 승인 여부를 작성하세요.',
+          `원래 질문:\n${question}\n\n분석:\n${analysis}\n\n운영 전략:\n${operations}\n\n광고 전략:\n${marketing}`
+        );
+        showOutput(4, qa); setStep(4, 'done');
+      } catch (error) {
+        errorBox.textContent = error.message;
+        errorBox.style.display = 'block';
+      } finally {
+        startButton.disabled = false;
+      }
+    });
+
+    document.getElementById('reset').addEventListener('click', () => location.reload());
+  </script>
+</body>
+</html>
