@@ -1,53 +1,102 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
+export const config = {
+  maxDuration: 60,
+};
+
+const MODEL = process.env.OPENAI_MODEL || 'gpt-5.5';
+const MAX_PROMPT_LENGTH = 120_000;
+
+function extractOutputText(data) {
+  if (typeof data.output_text === 'string' && data.output_text.trim()) {
+    return data.output_text.trim();
+  }
+
+  return (data.output || [])
+    .flatMap((item) => item.content || [])
+    .filter((item) => item.type === 'output_text' && typeof item.text === 'string')
+    .map((item) => item.text)
+    .join('')
+    .trim();
+}
 
 export default async function handler(req, res) {
-  // 사용자가 주소창에 직접 입력해서 접속했을 때 (GET 요청)
   if (req.method === 'GET') {
-    return res.status(405).json({ 
-      status : "API 정상 작동 중",
-      message : "이곳은 데이터를 처리하는 뒷단(API)입니다. 메인 웹페이지(index.html) 화면의 채팅창을 통해서 질문을 입력해 주세요!" 
+    return res.status(200).json({
+      status: 'ok',
+      provider: 'openai',
+      model: MODEL,
+      configured: Boolean(process.env.OPENAI_API_KEY),
     });
   }
 
-  // 허용되지 않은 통신 방식 차단
   if (req.method !== 'POST') {
-    return res.status(405).json({ error : 'Method Not Allowed' });
+    res.setHeader('Allow', 'GET, POST');
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
 
   try {
-    // 프론트엔드에서 보내는 구조(systemPrompt, userPrompt)를 모두 받아옵니다.
     const { prompt, message, systemPrompt, userPrompt } = req.body || {};
-    
-    // 실제 제미나이에 보낼 메인 질문을 결정합니다.
     const targetPrompt = userPrompt || prompt || message;
 
-    if (!targetPrompt) {
-      return res.status(400).json({ error : '질문 데이터가 전송되지 않았습니다.' });
+    if (typeof targetPrompt !== 'string' || !targetPrompt.trim()) {
+      return res.status(400).json({ error: '질문 데이터가 전송되지 않았습니다.' });
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    if (targetPrompt.length > MAX_PROMPT_LENGTH) {
+      return res.status(413).json({
+        error: `입력 데이터가 너무 큽니다. ${MAX_PROMPT_LENGTH.toLocaleString()}자 이하로 줄여 주세요.`,
+      });
+    }
+
+    const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
-      return res.status(500).json({ error : '버셀 환경 변수에 GEMINI_API_KEY가 없습니다.' });
+      return res.status(503).json({
+        error: 'Vercel Settings > Environment Variables에 OPENAI_API_KEY를 등록하고 Production으로 다시 배포해 주세요.',
+      });
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey);
-    
-    // 제미나이 모델 설정을 동적으로 구성합니다.
-    const modelConfig = { model : 'gemini-1.5-flash' };
-    
-    // 프론트엔드에서 페르소나/역할(systemPrompt)을 보냈다면 지침으로 주입합니다.
-    if (systemPrompt) {
-      modelConfig.systemInstruction = systemPrompt;
+    const requestBody = {
+      model: MODEL,
+      input: targetPrompt,
+      max_output_tokens: 6000,
+    };
+
+    if (typeof systemPrompt === 'string' && systemPrompt.trim()) {
+      requestBody.instructions = systemPrompt.trim();
     }
-    
-    const model = genAI.getGenerativeModel(modelConfig);
 
-    const result = await model.generateContent(targetPrompt);
-    const responseText = result.response.text();
+    const response = await fetch('https://api.openai.com/v1/responses', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(requestBody),
+      signal: AbortSignal.timeout(55_000),
+    });
 
-    return res.status(200).json({ reply : responseText, text : responseText });
+    const data = await response.json();
+
+    if (!response.ok) {
+      console.error('OpenAI API error:', response.status, data?.error?.type);
+      return res.status(502).json({
+        error: data?.error?.message || `OpenAI API 요청에 실패했습니다. (HTTP ${response.status})`,
+      });
+    }
+
+    const responseText = extractOutputText(data);
+
+    if (!responseText) {
+      return res.status(502).json({ error: 'GPT 응답에 텍스트가 없습니다.' });
+    }
+
+    return res.status(200).json({ reply: responseText, text: responseText });
   } catch (error) {
-    console.error('API 호출 실패:', error);
-    return res.status(500).json({ error : error.message });
+    const message =
+      error?.name === 'TimeoutError'
+        ? 'GPT 응답 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.'
+        : error?.message || '알 수 없는 서버 오류가 발생했습니다.';
+
+    console.error('OpenAI API 호출 실패:', error);
+    return res.status(500).json({ error: message });
   }
 }
