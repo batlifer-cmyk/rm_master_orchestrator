@@ -66,7 +66,7 @@ async function getGoogleAccessToken() {
   const header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
   const claims = base64url(JSON.stringify({
     iss: email,
-    scope: 'https://www.googleapis.com/auth/calendar.freebusy',
+    scope: 'https://www.googleapis.com/auth/calendar.readonly',
     aud: 'https://oauth2.googleapis.com/token',
     iat: now,
     exp: now + 3600,
@@ -82,14 +82,28 @@ async function getGoogleAccessToken() {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+      grant_type: 'urn:ietf:params:oauth-type:jwt-bearer',
       assertion: `${unsigned}.${signature}`,
     }),
     signal: AbortSignal.timeout(12_000),
   });
   const data = await tokenResponse.json();
   if (!tokenResponse.ok || !data.access_token) {
-    throw new Error(data.error_description || data.error || 'Google 서비스계정 토큰 발급 실패');
+    // Compatibility with Google's documented JWT bearer grant value.
+    const retryResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        assertion: `${unsigned}.${signature}`,
+      }),
+      signal: AbortSignal.timeout(12_000),
+    });
+    const retryData = await retryResponse.json();
+    if (!retryResponse.ok || !retryData.access_token) {
+      throw new Error(retryData.error_description || retryData.error || data.error_description || data.error || 'Google 서비스계정 토큰 발급 실패');
+    }
+    return retryData.access_token;
   }
   return data.access_token;
 }
@@ -119,58 +133,74 @@ function validateWindow(timeMin, timeMax) {
   if (b <= a) throw new Error('timeMax는 timeMin보다 뒤여야 합니다.');
   const days = (b - a) / 86400000;
   if (days > 70) throw new Error('한 번에 조회 가능한 기간은 최대 70일입니다.');
-  return { a, b };
 }
 
-function normalizeCalendarResult(id, googleResult) {
+async function listTimedBusyEvents(token, id, timeMin, timeMax, timezone) {
   const meta = CALENDARS[id];
-  const errors = Array.isArray(googleResult?.errors)
-    ? googleResult.errors.map(e => ({ domain: e.domain || '', reason: e.reason || '' }))
-    : [];
-  const busy = Array.isArray(googleResult?.busy)
-    ? googleResult.busy
-        .filter(x => x && x.start && x.end)
-        .map(x => ({ start: x.start, end: x.end }))
-    : [];
-  return {
-    id,
-    name: meta.name,
-    source: meta.source,
-    ok: errors.length === 0,
-    busy,
-    errors,
-  };
+  const busy = [];
+  let pageToken = '';
+  try {
+    do {
+      const params = new URLSearchParams({
+        timeMin,
+        timeMax,
+        timeZone: timezone,
+        singleEvents: 'true',
+        orderBy: 'startTime',
+        maxResults: '2500',
+        fields: 'items(status,transparency,start,end),nextPageToken',
+      });
+      if (pageToken) params.set('pageToken', pageToken);
+      const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(meta.calendarId)}/events?${params}`;
+      const response = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        signal: AbortSignal.timeout(15_000),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        return {
+          id,
+          name: meta.name,
+          source: meta.source,
+          ok: false,
+          busy: [],
+          errors: [{ reason: data?.error?.errors?.[0]?.reason || `http_${response.status}` }],
+        };
+      }
+      for (const event of data.items || []) {
+        if (!event || event.status === 'cancelled' || event.transparency === 'transparent') continue;
+        // RM uses all-day events as availability notes. Only timed events block lessons.
+        if (!event.start?.dateTime || !event.end?.dateTime) continue;
+        busy.push({ start: event.start.dateTime, end: event.end.dateTime });
+      }
+      pageToken = data.nextPageToken || '';
+    } while (pageToken);
+
+    return { id, name: meta.name, source: meta.source, ok: true, busy, errors: [] };
+  } catch (error) {
+    return {
+      id,
+      name: meta.name,
+      source: meta.source,
+      ok: false,
+      busy: [],
+      errors: [{ reason: error.message || 'calendar_read_failed' }],
+    };
+  }
 }
 
-async function queryFreeBusy({ instructors, timeMin, timeMax, timezone }) {
+async function queryCalendars({ instructors, timeMin, timeMax, timezone }) {
   validateWindow(timeMin, timeMax);
   const token = await getGoogleAccessToken();
-  const items = instructors.map(id => ({ id: CALENDARS[id].calendarId }));
-  const response = await fetch('https://www.googleapis.com/calendar/v3/freeBusy', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ timeMin, timeMax, timeZone: timezone, items }),
-    signal: AbortSignal.timeout(15_000),
-  });
-  const data = await response.json();
-  if (!response.ok) {
-    const message = data?.error?.message || `Google Calendar API 오류 (${response.status})`;
-    const error = new Error(message);
-    error.googleStatus = response.status;
-    error.googleReason = data?.error?.errors?.[0]?.reason || '';
-    throw error;
-  }
-
-  const byCalendarId = data.calendars || {};
-  const calendars = instructors.map(id => normalizeCalendarResult(id, byCalendarId[CALENDARS[id].calendarId] || {}));
+  const calendars = await Promise.all(
+    instructors.map(id => listTimedBusyEvents(token, id, timeMin, timeMax, timezone)),
+  );
   return {
     ok: calendars.every(x => x.ok),
-    timeMin: data.timeMin || timeMin,
-    timeMax: data.timeMax || timeMax,
+    timeMin,
+    timeMax,
     timezone,
+    provider: 'google-calendar-events-sanitized',
     calendars,
   };
 }
@@ -190,14 +220,14 @@ export default async function handler(req, res) {
         status: 'ok',
         serviceAccountConfigured: Boolean(process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL && process.env.GOOGLE_PRIVATE_KEY),
         serviceAccountEmail: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL || null,
-        provider: 'google-calendar-freebusy',
+        provider: 'google-calendar-events-sanitized',
         instructors: Object.entries(CALENDARS).map(([id, value]) => ({ id, name: value.name, source: value.source })),
       });
     }
-    const result = await queryFreeBusy(input);
+    const result = await queryCalendars(input);
     return res.status(200).json(result);
   } catch (error) {
-    console.error('Calendar FreeBusy API failed:', error);
+    console.error('Calendar events API failed:', error);
     return res.status(500).json({
       ok: false,
       error: error.message || 'Calendar API 오류',
