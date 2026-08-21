@@ -4,9 +4,13 @@ import { parseJsonBody, requirePost, requireRmRecordAuth } from '../lib/rm-recor
 const MAX_CHUNK_BYTES = 2 * 1024 * 1024;
 const UPLOAD_ID_RE = /^[A-Za-z0-9_-]{8,80}$/;
 
+function blobConfigured() {
+  return Boolean(process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN);
+}
+
 export default async function handler(req, res) {
   if (!requirePost(req, res) || !requireRmRecordAuth(req, res)) return;
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!blobConfigured()) {
     return res.status(503).json({ error: 'Private Blob 스토리지가 아직 연결되지 않았습니다.' });
   }
 

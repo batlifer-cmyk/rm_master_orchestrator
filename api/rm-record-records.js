@@ -1,9 +1,13 @@
 import { get, list } from '@vercel/blob';
 import { requirePost, requireRmRecordAuth } from '../lib/rm-record-auth.js';
 
+function blobConfigured() {
+  return Boolean(process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN);
+}
+
 export default async function handler(req, res) {
   if (!requirePost(req, res) || !requireRmRecordAuth(req, res)) return;
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!blobConfigured()) {
     return res.status(200).json({ records: [], blobConfigured: false });
   }
 

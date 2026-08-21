@@ -3,9 +3,13 @@ import { parseJsonBody, requirePost, requireRmRecordAuth } from '../lib/rm-recor
 
 const UPLOAD_ID_RE = /^[A-Za-z0-9_-]{8,80}$/;
 
+function blobConfigured() {
+  return Boolean(process.env.BLOB_STORE_ID || process.env.BLOB_READ_WRITE_TOKEN);
+}
+
 export default async function handler(req, res) {
   if (!requirePost(req, res) || !requireRmRecordAuth(req, res)) return;
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return res.status(200).json({ deleted: 0 });
+  if (!blobConfigured()) return res.status(200).json({ deleted: 0 });
 
   const body = parseJsonBody(req);
   const uploadId = String(body.uploadId || '');
