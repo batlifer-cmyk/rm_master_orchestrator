@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#111111" />
+  <title>RM Record · Ryan Members</title>
+  <style>
+    :root{--bg:#f4f4f1;--panel:#fff;--ink:#151515;--muted:#74746e;--line:#deded8;--danger:#a22d25}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.5}.center{min-height:100vh;display:grid;place-items:center;padding:20px}.card{width:min(430px,100%);background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:34px;box-shadow:0 8px 32px rgba(0,0,0,.04)}.eyebrow{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--muted)}h1{font-size:31px;margin:5px 0 10px;letter-spacing:-.04em}p{margin:0 0 22px}.muted{color:var(--muted)}label span{display:block;font-size:12px;font-weight:700;color:var(--muted);margin:0 0 7px}input{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px 13px;background:#fff;outline:none;font:inherit}input:focus{border-color:#888}.primary{width:100%;border:0;border-radius:12px;background:#111;color:#fff;padding:13px 16px;font-weight:800;font:inherit;cursor:pointer;margin-top:12px}.primary:disabled{opacity:.45;cursor:wait}.error,.notice{padding:11px 12px;border-radius:11px;font-size:13px;margin:12px 0}.error{background:#fff0ee;color:var(--danger);border:1px solid #f1c7c2}.notice{background:#f0f0ec;color:#555;border:1px solid var(--line)}.hidden{display:none!important}.foot{margin-top:17px;font-size:11px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <main class="center">
+    <form id="loginForm" class="card">
+      <div class="eyebrow">RYAN MEMBERS · INTERNAL</div>
+      <h1>RM RECORD</h1>
+      <p class="muted">이 기기에서 한 번 로그인하면 30일 동안 자동 접속됩니다.</p>
+      <div id="loading" class="notice">기존 로그인 상태를 확인하고 있습니다…</div>
+      <div id="loginFields" class="hidden">
+        <label><span>내부 접근키 · 최초 1회</span><input id="accessKey" type="password" autocomplete="current-password" /></label>
+        <div id="message"></div>
+        <button id="loginBtn" class="primary" type="submit">접속 · 30일 유지</button>
+        <div class="foot">접근키는 브라우저 저장소에 저장하지 않습니다. 로그인 후 HttpOnly 보안 쿠키로 유지됩니다.</div>
+      </div>
+    </form>
+  </main>
+<script>
+(() => {
+  const health='/api/rm-record-health';
+  const login='/api/rm-record-login';
+  const marker='rm_record_access_key';
+  const $=id=>document.getElementById(id);
+  const showLogin=(text='')=>{
+    $('loading').classList.add('hidden');
+    $('loginFields').classList.remove('hidden');
+    if(text)$('message').innerHTML=`<div class="error">${text.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}</div>`;
+    $('accessKey').focus();
+  };
+  const enter=()=>{
+    // Existing RM Record page only needs a non-empty session marker; server auth is the HttpOnly cookie.
+    sessionStorage.setItem(marker,'cookie-session');
+    location.replace('/rm-record.html');
+  };
+  async function json(url,options={}){
+    const res=await fetch(url,{credentials:'same-origin',...options});
+    const data=await res.json().catch(()=>({}));
+    if(!res.ok){const e=new Error(data.error||`요청 실패 (${res.status})`);e.status=res.status;throw e;}
+    return data;
+  }
+  $('loginForm').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const key=$('accessKey').value.trim();
+    if(!key)return;
+    $('loginBtn').disabled=true;
+    $('message').innerHTML='<div class="notice">로그인 중…</div>';
+    try{
+      await json(login,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accessKey:key})});
+      $('accessKey').value='';
+      enter();
+    }catch(err){
+      $('loginBtn').disabled=false;
+      showLogin(err.status===401?'접근키가 올바르지 않습니다.':err.message);
+    }
+  });
+  (async()=>{
+    sessionStorage.removeItem(marker);
+    try{await json(health,{method:'GET'});enter();}
+    catch{showLogin();}
+  })();
+})();
+</script>
+</body>
+</html>
