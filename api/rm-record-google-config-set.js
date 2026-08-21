@@ -1,9 +1,21 @@
-import { parseJsonBody, requirePost, requireRmRecordAdmin } from '../lib/rm-record-auth.js';
+import { parseJsonBody, requireRmRecordAdmin } from '../lib/rm-record-auth.js';
 import { saveRmGoogleClientId } from '../lib/rm-record-google-config.js';
 
 export default async function handler(req, res) {
-  if (!requirePost(req, res) || !requireRmRecordAdmin(req, res)) return;
   res.setHeader('Cache-Control', 'no-store');
+
+  if (req.method === 'GET') {
+    if (!requireRmRecordAdmin(req, res)) return;
+    return res.status(200).json({ admin: true });
+  }
+
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'GET, POST');
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
+  if (!requireRmRecordAdmin(req, res)) return;
+
   try {
     const { clientId } = parseJsonBody(req);
     const saved = await saveRmGoogleClientId(clientId);
