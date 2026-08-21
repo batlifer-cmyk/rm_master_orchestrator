@@ -1,0 +1,178 @@
+name: RM Record cookie auth patch main
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/rm-record-cookie-patch-main.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Patch RM Record authentication
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          p = Path('rm-record.html')
+          s = p.read_text()
+          s = s.replace(
+              "    cleanup:'/api/rm-record-cleanup', records:'/api/rm-record-records'\n",
+              "    cleanup:'/api/rm-record-cleanup', records:'/api/rm-record-records', login:'/api/rm-record-login', logout:'/api/rm-record-logout'\n"
+          )
+          s = s.replace("  let key = sessionStorage.getItem('rm_record_access_key') || '';\n", "  let key = '';\n")
+          s = s.replace(
+              "  const authHeaders = (json=true) => ({...(json?{'Content-Type':'application/json'}:{}),'X-RM-Access-Key':key});\n",
+              "  const authHeaders = (json=true) => ({...(json?{'Content-Type':'application/json'}:{})});\n"
+          )
+          s = s.replace(
+              "    const res = await fetch(url,{...options,headers:{...(options.headers||{}),'X-RM-Access-Key':key}});\n",
+              "    const res = await fetch(url,{credentials:'same-origin',...options,headers:{...(options.headers||{})}});\n"
+          )
+
+          old = """  async function checkHealth(candidate) {
+    key = candidate;
+    return api(API.health,{method:'GET',headers:{'X-RM-Access-Key':candidate}});
+  }
+"""
+          new = """  async function checkHealth() {
+    return api(API.health,{method:'GET'});
+  }
+"""
+          if old not in s: raise SystemExit('checkHealth block not found')
+          s = s.replace(old, new)
+
+          old = """  $('loginForm').addEventListener('submit', async e => {
+    e.preventDefault(); const candidate=$('accessKey').value.trim(); msg($('loginMessage'),'연결 상태를 확인하고 있습니다…');
+    try { const health=await checkHealth(candidate); key=candidate; sessionStorage.setItem('rm_record_access_key',key); msg($('loginMessage'),''); enterApp(health); }
+    catch(err){ key=''; msg($('loginMessage'),err.status===401?'접근키가 올바르지 않습니다.':err.message,'error'); }
+  });
+  $('logoutBtn').onclick=()=>{sessionStorage.removeItem('rm_record_access_key');location.reload();};
+"""
+          new = """  $('loginForm').addEventListener('submit', async e => {
+    e.preventDefault(); const candidate=$('accessKey').value.trim(); msg($('loginMessage'),'30일 자동 로그인을 설정하고 있습니다…');
+    try {
+      await api(API.login,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accessKey:candidate})});
+      $('accessKey').value=''; sessionStorage.removeItem('rm_record_access_key');
+      const health=await checkHealth(); msg($('loginMessage'),''); enterApp(health);
+    } catch(err){ msg($('loginMessage'),err.status===401?'접근키가 올바르지 않습니다.':err.message,'error'); }
+  });
+  $('logoutBtn').onclick=async()=>{
+    try{await api(API.logout,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});}catch{}
+    sessionStorage.removeItem('rm_record_access_key'); location.reload();
+  };
+"""
+          if old not in s: raise SystemExit('login block not found')
+          s = s.replace(old, new)
+
+          old = "    if(!key)return; try{const out=await api(API.records,{method:'POST',headers:authHeaders(),body:'{}'});"
+          new = "    try{const out=await api(API.records,{method:'POST',headers:authHeaders(),body:'{}'});"
+          if old not in s: raise SystemExit('recent-list key guard not found')
+          s = s.replace(old, new)
+
+          old = "  (async()=>{if(!key)return;try{const health=await checkHealth(key);enterApp(health)}catch{sessionStorage.removeItem('rm_record_access_key');key='';}})();\n"
+          new = "  (async()=>{sessionStorage.removeItem('rm_record_access_key');try{const health=await checkHealth();enterApp(health)}catch{}})();\n"
+          if old not in s: raise SystemExit('startup block not found')
+          s = s.replace(old, new)
+          s = s.replace('<button class="primary" type="submit">접속</button>', '<button class="primary" type="submit">접속 · 이 기기에서 30일 유지</button>')
+          p.write_text(s)
+
+          auth = Path('lib/rm-record-auth.js')
+          a = auth.read_text()
+          old = """export function isRmRecordAuthorized(req) {
+  const value = req.headers['x-rm-access-key'];
+  const input = Array.isArray(value) ? value[0] : value;
+  return verifyRmRecordAccessKey(input || '');
+}
+"""
+          new = """const SESSION_COOKIE = 'rm_record_session';
+
+function cookieValue(req, name) {
+  const raw = req.headers?.cookie;
+  if (typeof raw !== 'string') return '';
+  for (const part of raw.split(';')) {
+    const i = part.indexOf('=');
+    if (i < 0) continue;
+    const key = part.slice(0, i).trim();
+    if (key !== name) continue;
+    try { return decodeURIComponent(part.slice(i + 1).trim()); } catch { return ''; }
+  }
+  return '';
+}
+
+export function rmRecordSessionCookie(accessKey, maxAge = 60 * 60 * 24 * 30) {
+  return `${SESSION_COOKIE}=${encodeURIComponent(accessKey)}; Max-Age=${maxAge}; Path=/api/rm-record; HttpOnly; Secure; SameSite=Strict`;
+}
+
+export function clearRmRecordSessionCookie() {
+  return `${SESSION_COOKIE}=; Max-Age=0; Path=/api/rm-record; HttpOnly; Secure; SameSite=Strict`;
+}
+
+export function isRmRecordAuthorized(req) {
+  const cookieKey = cookieValue(req, SESSION_COOKIE);
+  if (verifyRmRecordAccessKey(cookieKey)) return true;
+  const value = req.headers['x-rm-access-key'];
+  const input = Array.isArray(value) ? value[0] : value;
+  return verifyRmRecordAccessKey(input || '');
+}
+"""
+          if old not in a: raise SystemExit('auth block not found')
+          auth.write_text(a.replace(old, new))
+
+          Path('api/rm-record-login.js').write_text("""import { parseJsonBody, rmRecordSessionCookie, verifyRmRecordAccessKey } from '../lib/rm-record-auth.js';
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+  const { accessKey } = parseJsonBody(req);
+  if (!verifyRmRecordAccessKey(accessKey || '')) {
+    return res.status(401).json({ error: '접근키가 올바르지 않습니다.' });
+  }
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Set-Cookie', rmRecordSessionCookie(accessKey));
+  return res.status(200).json({ ok: true, expiresInDays: 30 });
+}
+""")
+
+          Path('api/rm-record-logout.js').write_text("""import { clearRmRecordSessionCookie } from '../lib/rm-record-auth.js';
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'POST');
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('Set-Cookie', clearRmRecordSessionCookie());
+  return res.status(200).json({ ok: true });
+}
+""")
+          PY
+      - name: Sanity check
+        run: |
+          node --check lib/rm-record-auth.js
+          node --check api/rm-record-login.js
+          node --check api/rm-record-logout.js
+          grep -q "30일 자동 로그인" rm-record.html
+          grep -q "HttpOnly; Secure; SameSite=Strict" lib/rm-record-auth.js
+      - name: Commit patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- rm-record.html lib/rm-record-auth.js api/rm-record-login.js api/rm-record-logout.js
+          git commit -m "Add 30-day RM Record secure login cookie"
+          git push origin HEAD:main
