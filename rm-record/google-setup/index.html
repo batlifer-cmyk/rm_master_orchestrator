@@ -74,7 +74,7 @@
 
   async function checkAdmin(){
     try{
-      const out=await json('/api/rm-record-admin-status',{method:'GET'});
+      const out=await json('/api/rm-record-google-config-set',{method:'GET'});
       setAdminReady(Boolean(out.admin));
       return Boolean(out.admin);
     }catch{
