@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#111111" />
+  <title>RM Record · Ryan Members</title>
+  <style>
+    :root{--bg:#f4f4f1;--panel:#fff;--ink:#151515;--muted:#74746e;--line:#deded8;--accent:#111;--danger:#a22d25;--soft:#eeeeea;--ok:#245e3d}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.5}
+    button,input,textarea{font:inherit} button{cursor:pointer}.hidden{display:none!important}.shell{max-width:1180px;margin:auto;padding:28px 18px 70px}.center{min-height:100vh;display:grid;place-items:center;padding:20px}
+    .panel,.login{background:var(--panel);border:1px solid var(--line);border-radius:20px;box-shadow:0 8px 32px rgba(0,0,0,.04)}.login{width:min(430px,100%);padding:34px}.eyebrow{font-size:11px;font-weight:800;letter-spacing:.14em;color:var(--muted)}h1{font-size:31px;margin:5px 0 10px;letter-spacing:-.04em}h2{font-size:20px;margin:0 0 16px;letter-spacing:-.02em}h3{font-size:14px;margin:18px 0 8px}.muted{color:var(--muted)}
+    label>span,.label{display:block;font-size:12px;font-weight:700;color:var(--muted);margin:0 0 7px}input[type=text],input[type=password],textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px 13px;background:#fff;outline:none}input:focus,textarea:focus{border-color:#888}textarea{min-height:76px;resize:vertical}.primary{width:100%;border:0;border-radius:12px;background:var(--accent);color:#fff;padding:13px 16px;font-weight:800}.primary:disabled{opacity:.35;cursor:not-allowed}.ghost{border:1px solid var(--line);background:#fff;border-radius:10px;padding:8px 11px}.error,.notice,.success{padding:11px 12px;border-radius:11px;font-size:13px;margin:12px 0}.error{background:#fff0ee;color:var(--danger);border:1px solid #f1c7c2}.notice{background:#f2efe6;color:#65562d;border:1px solid #ded2b6}.success{background:#edf6f0;color:var(--ok);border:1px solid #c3dccb}
+    .top{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px}.top h1{margin-bottom:0}.grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,.75fr);gap:18px}.capture,.recent,.result{padding:22px}.kind-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:18px}.kind{border:1px solid var(--line);background:#fff;border-radius:13px;padding:13px;text-align:left}.kind strong{display:block}.kind small{display:block;color:var(--muted);margin-top:4px}.kind.active{background:#111;color:#fff;border-color:#111}.kind.active small{color:#cfcfc9}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}.record-box{border:1px dashed #c9c9c1;border-radius:15px;padding:16px;margin:18px 0;background:#fafaf8}.record-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.record-btn,.file-label{border:0;border-radius:11px;padding:11px 14px;font-weight:800;background:#e9e9e4}.record-btn.stop{background:#ffe9e6;color:#a1251e}.file-label input{display:none}.or{font-size:12px;color:var(--muted)}.file-info{font-size:13px;margin-top:11px;display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap}.consent{display:flex;align-items:flex-start;gap:9px;font-size:13px;margin:14px 0}.consent input{margin-top:4px}.status{font-size:13px;padding:11px 12px;background:#f0f0ec;border-radius:10px;margin:10px 0}.section-head{display:flex;justify-content:space-between;align-items:center;gap:10px}.recent-list{display:grid;gap:9px;max-height:560px;overflow:auto}.recent-item{border-top:1px solid var(--line);padding:12px 0}.recent-item:first-child{border-top:0}.recent-meta{display:flex;gap:7px;font-size:11px;color:var(--muted);margin-bottom:4px}.recent-item p{margin:4px 0 0;font-size:12px;color:var(--muted)}
+    .results{margin-top:18px;display:grid;gap:18px}.result-title{display:flex;justify-content:space-between;gap:10px}.lead{font-size:16px}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:18px}.fact-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:16px}.fact{background:var(--soft);border-radius:11px;padding:11px}.fact span{display:block;color:var(--muted);font-size:11px}.fact strong{font-size:13px}.chips{display:flex;gap:6px;flex-wrap:wrap}.chip{background:var(--soft);padding:5px 9px;border-radius:999px;font-size:12px}.correction{display:grid;grid-template-columns:1fr 1fr;gap:8px;border-top:1px solid var(--line);padding:10px 0}.correction small{grid-column:1/-1;color:var(--muted)}.transcript{display:grid;gap:13px;max-height:660px;overflow:auto}.segment{display:grid;grid-template-columns:130px 1fr;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--line)}.speaker{font-size:12px}.speaker span{display:block;color:var(--muted)}.segment p{margin:0;white-space:pre-wrap}.footer{text-align:center;color:var(--muted);font-size:11px;margin-top:28px}
+    @media(max-width:800px){.shell{padding:18px 12px 55px}.grid{grid-template-columns:1fr}.recent{order:2}.kind-grid{grid-template-columns:1fr}.form-grid,.two-col{grid-template-columns:1fr}.fact-grid{grid-template-columns:1fr 1fr}.segment{grid-template-columns:1fr;gap:4px}.top h1{font-size:26px}.record-actions>*{flex:1;text-align:center}.or{flex:0}.login{padding:26px}}
+  </style>
+</head>
+<body>
+  <main id="loginView" class="center">
+    <form id="loginForm" class="login">
+      <div class="eyebrow">RYAN MEMBERS · INTERNAL</div>
+      <h1>RM RECORD</h1>
+      <p class="muted">상담과 수업의 음성을 화자별 원문과 운영 데이터로 변환합니다.</p>
+      <label><span>내부 접근키</span><input id="accessKey" type="password" autocomplete="current-password" required /></label>
+      <div id="loginMessage"></div>
+      <button class="primary" type="submit">접속</button>
+    </form>
+  </main>
+
+  <main id="appView" class="shell hidden">
+    <header class="top">
+      <div><div class="eyebrow">RYAN MEMBERS · CONVERSATION INTELLIGENCE</div><h1>RM RECORD</h1></div>
+      <button id="logoutBtn" class="ghost">로그아웃</button>
+    </header>
+    <div id="infraMessage"></div>
+
+    <div class="grid">
+      <section class="panel capture">
+        <h2>새 기록</h2>
+        <div class="kind-grid">
+          <button class="kind active" data-kind="phone"><strong>전화상담</strong><small>통화 녹음파일 전사</small></button>
+          <button class="kind" data-kind="in_person"><strong>대면상담</strong><small>상담 자리에서 직접 녹음</small></button>
+          <button class="kind" data-kind="lesson"><strong>수업</strong><small>한·영 혼용 원문 보존</small></button>
+        </div>
+        <div class="form-grid">
+          <label><span id="subjectLabel">상담 대상자</span><input id="subjectName" type="text" placeholder="예: 김하정" /></label>
+          <label><span id="staffLabel">상담자</span><input id="staffName" type="text" placeholder="예: Matthew" /></label>
+        </div>
+        <label><span>메모 · 과정명 · 특이사항</span><textarea id="note" placeholder="예: 간호영어면접 / 화·목 19시 이후"></textarea></label>
+
+        <div class="record-box">
+          <div class="record-actions">
+            <button id="recordBtn" class="record-btn" type="button">● 녹음 시작</button>
+            <span class="or">또는</span>
+            <label class="file-label">녹음파일 선택<input id="fileInput" type="file" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.webm,.ogg,.mp4" /></label>
+          </div>
+          <div id="fileInfo" class="file-info muted">음성파일이 선택되지 않았습니다.</div>
+        </div>
+
+        <label class="consent"><input id="consent" type="checkbox" /><span>녹음 사실 및 라이언멤버스 내부 전사·분석 처리에 대한 동의를 확인했습니다.</span></label>
+        <div id="processMessage"></div>
+        <button id="processBtn" class="primary" type="button" disabled>전사 및 분석 시작</button>
+      </section>
+
+      <aside class="panel recent">
+        <div class="section-head"><h2>최근 기록</h2><button id="refreshBtn" class="ghost">새로고침</button></div>
+        <div id="recentList" class="recent-list"><p class="muted">저장된 기록이 없습니다.</p></div>
+      </aside>
+    </div>
+
+    <section id="results" class="results hidden">
+      <div class="panel result">
+        <div class="result-title"><div><div class="eyebrow">ANALYSIS COMPLETE</div><h2 id="resultTitle"></h2></div><strong id="resultDuration"></strong></div>
+        <p id="summary" class="lead"></p>
+        <div class="two-col"><div><h3>핵심 내용</h3><ul id="keyPoints"></ul></div><div><h3>다음 조치</h3><ul id="nextActions"></ul></div></div>
+        <div id="consultFacts" class="fact-grid"></div>
+        <div id="lessonBox" class="hidden"></div>
+      </div>
+      <div class="panel result">
+        <div class="section-head"><div><div class="eyebrow">RAW TRANSCRIPT</div><h2>원문 전사</h2></div><span class="muted">번역·문장 재작성 없음</span></div>
+        <div id="transcript" class="transcript"></div>
+      </div>
+    </section>
+    <div class="footer">RM Record V1 · 원본 오디오 · 원문 전사 · AI 분석을 분리 저장합니다.</div>
+  </main>
+
+<script>
+(() => {
+  const API = {
+    health:'/api/rm-record-health', upload:'/api/rm-record-upload', process:'/api/rm-record-process',
+    cleanup:'/api/rm-record-cleanup', records:'/api/rm-record-records'
+  };
+  const CHUNK_SIZE = 2 * 1024 * 1024;
+  const MAX_FILE = 24 * 1024 * 1024;
+  let key = sessionStorage.getItem('rm_record_access_key') || '';
+  let kind = 'phone', file = null, blobReady = false, recording = false, startedAt = 0, ticker = null;
+  let recorder = null, stream = null, recorderChunks = [];
+  const $ = (id) => document.getElementById(id);
+  const authHeaders = (json=true) => ({...(json?{'Content-Type':'application/json'}:{}),'X-RM-Access-Key':key});
+  const esc = (v) => String(v ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  const fmt = (sec) => { sec=Math.max(0,Math.floor(Number(sec)||0)); const h=Math.floor(sec/3600),m=Math.floor(sec%3600/60),s=sec%60; return h?`${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${m}:${String(s).padStart(2,'0')}`; };
+  const msg = (target,text,type='notice') => target.innerHTML = text ? `<div class="${type}">${esc(text)}</div>` : '';
+  const bytes = (n) => `${(n/1024/1024).toFixed(1)} MB`;
+
+  async function api(url, options={}) {
+    const res = await fetch(url,{...options,headers:{...(options.headers||{}),'X-RM-Access-Key':key}});
+    const data = await res.json().catch(()=>({}));
+    if (!res.ok) { const e=new Error(data.error||`요청 실패 (${res.status})`); e.status=res.status; throw e; }
+    return data;
+  }
+
+  async function checkHealth(candidate) {
+    key = candidate;
+    return api(API.health,{method:'GET',headers:{'X-RM-Access-Key':candidate}});
+  }
+
+  function enterApp(health) {
+    blobReady = Boolean(health.blobConfigured);
+    $('loginView').classList.add('hidden'); $('appView').classList.remove('hidden');
+    if (!blobReady) msg($('infraMessage'),'앱 배포와 OpenAI 연결은 완료되었습니다. Private Blob 스토리지 연결 후 전사 저장 기능이 활성화됩니다.','notice');
+    else msg($('infraMessage'),'OpenAI와 Private Blob 연결이 정상입니다.','success');
+    updateProcessButton(); loadRecent();
+  }
+
+  $('loginForm').addEventListener('submit', async e => {
+    e.preventDefault(); const candidate=$('accessKey').value.trim(); msg($('loginMessage'),'연결 상태를 확인하고 있습니다…');
+    try { const health=await checkHealth(candidate); key=candidate; sessionStorage.setItem('rm_record_access_key',key); msg($('loginMessage'),''); enterApp(health); }
+    catch(err){ key=''; msg($('loginMessage'),err.status===401?'접근키가 올바르지 않습니다.':err.message,'error'); }
+  });
+  $('logoutBtn').onclick=()=>{sessionStorage.removeItem('rm_record_access_key');location.reload();};
+
+  document.querySelectorAll('.kind').forEach(btn=>btn.onclick=()=>{
+    document.querySelectorAll('.kind').forEach(x=>x.classList.remove('active'));btn.classList.add('active');kind=btn.dataset.kind;
+    $('subjectLabel').textContent=kind==='lesson'?'학생 이름':'상담 대상자'; $('staffLabel').textContent=kind==='lesson'?'담당 강사':'상담자';
+  });
+
+  function setFile(next) {
+    file=next; $('results').classList.add('hidden');
+    if (!file) $('fileInfo').innerHTML='<span>음성파일이 선택되지 않았습니다.</span>';
+    else $('fileInfo').innerHTML=`<strong>${esc(file.name)}</strong><span>${esc(bytes(file.size))} · ${esc(file.type||'audio')}</span>`;
+    if (file && file.size>MAX_FILE) msg($('processMessage'),'이 파일은 24MB를 초과합니다. 앱에서 직접 녹음하거나 더 낮은 비트레이트로 변환해 주세요.','error'); else msg($('processMessage'),'');
+    updateProcessButton();
+  }
+  $('fileInput').onchange=e=>setFile(e.target.files?.[0]||null);
+  $('consent').onchange=updateProcessButton;
+  function updateProcessButton(){ $('processBtn').disabled=!file||file.size>MAX_FILE||!$('consent').checked||recording||!blobReady; }
+
+  async function startRecording() {
+    stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    const supported=['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(t=>window.MediaRecorder&&MediaRecorder.isTypeSupported(t));
+    recorder=new MediaRecorder(stream,supported?{mimeType:supported,audioBitsPerSecond:32000}:{audioBitsPerSecond:32000}); recorderChunks=[];
+    recorder.ondataavailable=e=>{if(e.data.size)recorderChunks.push(e.data)};
+    recorder.onstop=()=>{const b=new Blob(recorderChunks,{type:recorder.mimeType||'audio/webm'});const ext=b.type.includes('mp4')?'.m4a':'.webm';setFile(new File([b],`rm-record-${Date.now()}${ext}`,{type:b.type}));stream?.getTracks().forEach(t=>t.stop());stream=null;};
+    recorder.start(1000);recording=true;startedAt=Date.now(); $('recordBtn').classList.add('stop'); ticker=setInterval(()=>{$('recordBtn').textContent=`■ 녹음 종료 · ${fmt((Date.now()-startedAt)/1000)}`},500); updateProcessButton();
+  }
+  function stopRecording(){ if(recorder&&recorder.state!=='inactive')recorder.stop();recording=false;clearInterval(ticker);$('recordBtn').classList.remove('stop');$('recordBtn').textContent='● 녹음 시작';updateProcessButton(); }
+  $('recordBtn').onclick=async()=>{try{recording?stopRecording():await startRecording()}catch(err){msg($('processMessage'),err.message||'마이크를 시작하지 못했습니다.','error')}};
+
+  function partToBase64(blob){return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result).split(',')[1]||'');r.onerror=()=>reject(new Error('파일 조각을 읽지 못했습니다.'));r.readAsDataURL(blob);});}
+  async function cleanup(uploadId){try{await api(API.cleanup,{method:'POST',headers:authHeaders(),body:JSON.stringify({uploadId})})}catch{}}
+  async function uploadFile(target,uploadId){const total=Math.ceil(target.size/CHUNK_SIZE),refs=[];for(let i=0;i<total;i++){msg($('processMessage'),`1/3 비공개 업로드 중 · ${i+1}/${total}`);const part=target.slice(i*CHUNK_SIZE,Math.min(target.size,(i+1)*CHUNK_SIZE));const data=await partToBase64(part);const out=await api(API.upload,{method:'POST',headers:authHeaders(),body:JSON.stringify({uploadId,index:i,data})});refs.push(out.chunk);}return refs;}
+
+  $('processBtn').onclick=async()=>{
+    if(!file||!blobReady)return; const uploadId=crypto.randomUUID(); $('processBtn').disabled=true; $('results').classList.add('hidden');
+    try{
+      const chunks=await uploadFile(file,uploadId); msg($('processMessage'),'2/3 화자를 구분하며 전사하고 있습니다…');
+      const out=await api(API.process,{method:'POST',headers:authHeaders(),body:JSON.stringify({uploadId,chunks,originalName:file.name,contentType:file.type||'application/octet-stream',size:file.size,kind,subjectName:$('subjectName').value,staffName:$('staffName').value,note:$('note').value,consentConfirmed:true})});
+      msg($('processMessage'),'3/3 전사·분석·저장이 완료되었습니다.','success'); renderResult(out.record); loadRecent();
+    }catch(err){await cleanup(uploadId);msg($('processMessage'),err.message||'처리에 실패했습니다.','error');}
+    finally{updateProcessButton();}
+  };
+
+  function listHtml(values){return (values||[]).map(v=>`<li>${esc(v)}</li>`).join('')||'<li class="muted">없음</li>';}
+  function renderResult(r){
+    $('results').classList.remove('hidden'); $('resultTitle').textContent=r.analysis?.title||'분석 결과'; $('resultDuration').textContent=fmt(r.transcript?.duration); $('summary').textContent=r.analysis?.summary||'';
+    $('keyPoints').innerHTML=listHtml(r.analysis?.key_points);$('nextActions').innerHTML=listHtml(r.analysis?.next_actions);
+    const c=r.analysis?.consultation||{};const facts=[['목표',c.goal],['현재 수준',c.current_level],['희망 일정',c.schedule],['등록 신호',c.registration_signal||'판단불가'],['가격 반응',c.price_reaction],['고민',(c.concerns||[]).join(' · ')]];
+    $('consultFacts').innerHTML=r.kind==='lesson'?'':facts.map(([a,b])=>`<div class="fact"><span>${esc(a)}</span><strong>${esc(b||'—')}</strong></div>`).join('');
+    const l=r.analysis?.lesson||{};$('lessonBox').classList.toggle('hidden',r.kind!=='lesson');
+    if(r.kind==='lesson')$('lessonBox').innerHTML=`<h3>수업 주제</h3><div class="chips">${(l.topics||[]).map(v=>`<span class="chip">${esc(v)}</span>`).join('')||'<span class="muted">없음</span>'}</div><h3>교정 표현</h3>${(l.corrections||[]).map(x=>`<div class="correction"><del>${esc(x.original)}</del><strong>${esc(x.corrected)}</strong><small>${esc(x.reason)}</small></div>`).join('')||'<p class="muted">명확한 교정 항목이 없습니다.</p>'}<div class="two-col"><div><h3>어휘</h3><ul>${listHtml(l.vocabulary)}</ul></div><div><h3>문법 포커스</h3><ul>${listHtml(l.grammar_focus)}</ul></div></div><h3>과제·후속 연습</h3><ul>${listHtml(l.homework)}</ul>`;
+    const map=new Map((r.analysis?.speaker_map||[]).map(x=>[String(x.speaker),x.label]));
+    $('transcript').innerHTML=(r.transcript?.segments||[]).map((s,i)=>`<div class="segment"><div class="speaker"><strong>${esc(map.get(String(s.speaker))||`화자 ${s.speaker||i+1}`)}</strong><span>${esc(fmt(s.start))}</span></div><p>${esc(s.text)}</p></div>`).join('')||'<p class="muted">전사 구간이 없습니다.</p>';
+    $('results').scrollIntoView({behavior:'smooth',block:'start'});
+  }
+
+  async function loadRecent(){
+    if(!key)return; try{const out=await api(API.records,{method:'POST',headers:authHeaders(),body:'{}'});const items=out.records||[];$('recentList').innerHTML=items.length?items.map(x=>`<article class="recent-item"><div class="recent-meta"><span>${esc(x.kind==='phone'?'전화상담':x.kind==='in_person'?'대면상담':'수업')}</span><span>${esc(new Date(x.createdAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}))}</span><span>${esc(fmt(x.duration))}</span></div><strong>${esc(x.title||x.subjectName||'제목 없음')}</strong><p>${esc(x.summary||'')}</p></article>`).join(''):'<p class="muted">저장된 기록이 없습니다.</p>';}catch(err){$('recentList').innerHTML=`<p class="muted">${esc(err.message)}</p>`;}}
+  $('refreshBtn').onclick=loadRecent;
+
+  (async()=>{if(!key)return;try{const health=await checkHealth(key);enterApp(health)}catch{sessionStorage.removeItem('rm_record_access_key');key='';}})();
+})();
+</script>
+</body>
+</html>
