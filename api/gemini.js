@@ -6,7 +6,8 @@ const MODEL = process.env.OPENAI_MODEL || 'gpt-5.5';
 const MAX_PROMPT_LENGTH = 120_000;
 
 // JANDI /연락처 batch compatibility mode.
-// The existing Apps Script endpoint stays the source of truth for actual writes.
+// The existing Apps Script endpoint stays the source of truth for actual writes
+// and for posting confirmations to the existing JANDI Incoming Webhook.
 const JCB_KEY_HASH_HEX = '5b78269cb7cdd0108201e3612294418407b177b2e91f44b43dc2684c0b12da26';
 const JCB_UPSTREAM_IV_B64URL = 'DRFUXzJO8VrUoxT7';
 const JCB_UPSTREAM_CIPHERTEXT_B64URL = 'uqpFTq91VTDm_lhGE65dm5Trb9OTVKkL8Lgzi4T4faN9Mg_bXPw0hlTaD_VLKZWSXj47OhuViR-4Yc_ITf3RnDQ2l8AKHjS0YjTeVauSq_EuMGRF3CY5gDGiQnFQtNnpMVR9ZqILzpranLbuyNsiKg';
@@ -163,8 +164,12 @@ async function jcbMapWithConcurrency(items, concurrency, fn) {
   return results;
 }
 
-function jcbResponse(body, color = '#BBCBCD') {
-  return { body, connectColor: color };
+function jcbSilentAck(res, details = {}) {
+  // Deliberately do not return JANDI's { body: ... } response shape.
+  // JANDI therefore does not create an Outgoing-Webhook response message.
+  // The existing Apps Script posts the user-visible result to the intended
+  // room through its already-configured Incoming Webhook.
+  return res.status(200).json({ ok: true, ...details });
 }
 
 async function handleJandiContactBatch(req, res) {
@@ -176,6 +181,7 @@ async function handleJandiContactBatch(req, res) {
       ok: true,
       service: 'jandi-contact-batch',
       maxContacts: JCB_MAX_CONTACTS,
+      responseMode: 'silent-outgoing-existing-incoming-confirmation',
     });
   }
 
@@ -191,7 +197,7 @@ async function handleJandiContactBatch(req, res) {
   const rawText = dataText || jcbStripCommand(fullText);
 
   if (keyword && keyword !== '연락처') {
-    return res.status(400).json(jcbResponse('이 주소는 /연락처 전용입니다.', '#E67E22'));
+    return res.status(400).json({ error: 'wrong_keyword' });
   }
 
   let upstream;
@@ -199,35 +205,46 @@ async function handleJandiContactBatch(req, res) {
     upstream = jcbDecryptUpstream(key);
   } catch (error) {
     console.error('jandi-contact-batch upstream decrypt failed', error);
-    return res.status(500).json(jcbResponse('연락처 연결 설정을 읽지 못했습니다.', '#E74C3C'));
+    return res.status(500).json({ error: 'upstream_config_error' });
   }
 
   const candidateCount = jcbCountPhoneCandidates(rawText || fullText);
 
-  // 0~1건이면 기존 Apps Script에 원문 그대로 전달해 기존 동작을 보존한다.
+  // 0~1건: 현재 Apps Script에 원문 그대로 전달한다.
+  // 사용자에게 보이는 성공/오류 메시지는 Apps Script의 기존 Incoming Webhook이 담당한다.
   if (candidateCount <= 1) {
     try {
       const upstreamResult = await jcbCallUpstream(upstream, payload);
-      if (upstreamResult.json && typeof upstreamResult.json === 'object') {
-        return res.status(upstreamResult.status || 200).json(upstreamResult.json);
+      if (!upstreamResult.ok) {
+        console.error('jandi-contact-batch single upstream error', upstreamResult.status, upstreamResult.body);
       }
-      return res.status(upstreamResult.status || 200).send(upstreamResult.body || '');
+      return jcbSilentAck(res, {
+        processed: 1,
+        upstreamOk: upstreamResult.ok,
+      });
     } catch (error) {
       console.error('jandi-contact-batch single passthrough failed', error);
-      return res.status(502).json(jcbResponse('기존 연락처 저장 서버 호출에 실패했습니다.', '#E74C3C'));
+      return res.status(502).json({ error: 'upstream_call_failed' });
     }
   }
 
   const { contacts, skipped, truncated } = jcbParseBatch(rawText || fullText);
+
   if (!contacts.length) {
+    // 기존 Apps Script가 기존 방식대로 안내문을 Incoming Webhook으로 보내도록 원문 전달.
     try {
       const upstreamResult = await jcbCallUpstream(upstream, payload);
-      if (upstreamResult.json && typeof upstreamResult.json === 'object') {
-        return res.status(upstreamResult.status || 200).json(upstreamResult.json);
+      if (!upstreamResult.ok) {
+        console.error('jandi-contact-batch fallback upstream error', upstreamResult.status, upstreamResult.body);
       }
-      return res.status(upstreamResult.status || 200).send(upstreamResult.body || '');
+      return jcbSilentAck(res, {
+        processed: 1,
+        fallback: true,
+        upstreamOk: upstreamResult.ok,
+      });
     } catch (error) {
-      return res.status(502).json(jcbResponse('연락처 저장 서버 호출에 실패했습니다.', '#E74C3C'));
+      console.error('jandi-contact-batch fallback failed', error);
+      return res.status(502).json({ error: 'upstream_call_failed' });
     }
   }
 
@@ -242,42 +259,21 @@ async function handleJandiContactBatch(req, res) {
     return jcbCallUpstream(upstream, forwarded);
   });
 
-  const lines = [];
-  let saved = 0;
-  let failed = 0;
+  const failed = results.filter(result => !result?.ok).length;
+  if (failed) {
+    console.error('jandi-contact-batch partial upstream failures', {
+      total: contacts.length,
+      failed,
+      statuses: results.map(r => r?.status || 0),
+    });
+  }
 
-  results.forEach((result, index) => {
-    const contact = contacts[index];
-    const message = String(result?.body || '').replace(/\s+/g, ' ').trim();
-    const looksSaved = result?.ok && /저장\s*완료|저장완료/.test(message);
-    if (looksSaved) {
-      saved += 1;
-      lines.push(`✅ ${contact.name} ${contact.phone}`);
-    } else {
-      failed += 1;
-      lines.push(`⚠️ ${contact.name} ${contact.phone}${message ? ` — ${message}` : ''}`);
-    }
+  return jcbSilentAck(res, {
+    processed: contacts.length,
+    failed,
+    skipped: skipped.length,
+    truncated,
   });
-
-  const skippedUseful = skipped.filter(
-    line => !/^\s*\/\s*연락처\s*$/i.test(line),
-  );
-  if (skippedUseful.length) {
-    lines.push(
-      `⚠️ 인식 못한 줄 ${skippedUseful.length}건: ${skippedUseful.slice(0, 3).join(' / ')}${skippedUseful.length > 3 ? ' …' : ''}`,
-    );
-  }
-  if (truncated) {
-    lines.push(`⚠️ 한 번에 최대 ${JCB_MAX_CONTACTS}건까지만 처리했습니다.`);
-  }
-
-  const headline = failed === 0
-    ? `✅ 연락처 ${saved}건 저장 완료`
-    : `연락처 처리 결과: 저장 ${saved}건 / 확인 필요 ${failed}건`;
-
-  return res.status(200).json(
-    jcbResponse(`${headline}\n${lines.join('\n')}`, failed ? '#E67E22' : '#2ECC71'),
-  );
 }
 
 async function getSheetSummary() {
