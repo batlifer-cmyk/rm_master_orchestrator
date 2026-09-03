@@ -1,21 +1,17 @@
 import { createDecipheriv, createHash, timingSafeEqual } from 'node:crypto';
-import { GoogleAuth } from 'google-auth-library';
 
 export const config = { maxDuration: 300 };
 
 const MODEL = process.env.OPENAI_MODEL || 'gpt-5.5';
 const MAX_PROMPT_LENGTH = 120_000;
 
-// JANDI /연락처 direct-save mode.
-// Valid contacts are written directly to the operating student-contact sheet.
-// User-visible results are posted only to the dedicated CONSULTING Incoming Webhook.
+// JANDI /연락처 batch compatibility mode.
+// The existing Apps Script endpoint stays the source of truth for actual writes
+// and for posting confirmations to the existing JANDI Incoming Webhook.
 const JCB_KEY_HASH_HEX = '5b78269cb7cdd0108201e3612294418407b177b2e91f44b43dc2684c0b12da26';
-const JCB_INCOMING_IV_B64URL = 'incvG3i5MJkF8nsW';
-const JCB_INCOMING_CIPHERTEXT_B64URL = 'mM3TfayRIcUQdivcM3t3TnHvEq7FqaX-ZKWkh2vz-l9_6LwmLHek03In-qh2plO_75c6QXMuGsFyrP3ooZQwUMf3ko6eIvV4hmEghcRC5PK2zw';
-const JCB_INCOMING_TAG_B64URL = 'Zt9KJbh9btEpavja1Agiig';
-const JCB_SPREADSHEET_ID = '1P42_8yxR0Tlys8g48Cq1h4SryRHzTlljE0A-bvngwnE';
-const JCB_SHEET_NAME = '학생연락처';
-const JCB_MANUAL_RANGE = `'${JCB_SHEET_NAME}'!F:G`;
+const JCB_UPSTREAM_IV_B64URL = 'DRFUXzJO8VrUoxT7';
+const JCB_UPSTREAM_CIPHERTEXT_B64URL = 'uqpFTq91VTDm_lhGE65dm5Trb9OTVKkL8Lgzi4T4faN9Mg_bXPw0hlTaD_VLKZWSXj47OhuViR-4Yc_ITf3RnDQ2l8AKHjS0YjTeVauSq_EuMGRF3CY5gDGiQnFQtNnpMVR9ZqILzpranLbuyNsiKg';
+const JCB_UPSTREAM_TAG_B64URL = 'C0NUyT7JZdN5cJVbe-_5YQ';
 const JCB_MAX_CONTACTS = 20;
 const JCB_PHONE_RE = /(?<!\d)(01[016789])[\s-]?(\d{3,4})[\s-]?(\d{4})(?!\d)/g;
 
@@ -42,10 +38,10 @@ function jcbAuthorized(req) {
   return key;
 }
 
-function jcbDecryptIncomingUrl(key) {
-  const iv = Buffer.from(JCB_INCOMING_IV_B64URL, 'base64url');
-  const ciphertext = Buffer.from(JCB_INCOMING_CIPHERTEXT_B64URL, 'base64url');
-  const tag = Buffer.from(JCB_INCOMING_TAG_B64URL, 'base64url');
+function jcbDecryptUpstream(key) {
+  const iv = Buffer.from(JCB_UPSTREAM_IV_B64URL, 'base64url');
+  const ciphertext = Buffer.from(JCB_UPSTREAM_CIPHERTEXT_B64URL, 'base64url');
+  const tag = Buffer.from(JCB_UPSTREAM_TAG_B64URL, 'base64url');
   const decipher = createDecipheriv('aes-256-gcm', key, iv);
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
@@ -70,10 +66,6 @@ function jcbFormatPhone(groups) {
   return `${prefix}-${middle}-${last}`;
 }
 
-function jcbNormalizePhone(value) {
-  return String(value || '').replace(/\D/g, '');
-}
-
 function jcbCleanName(prefix) {
   return String(prefix || '')
     .replace(/^\s*(?:[-*•·]|\d+[.)])\s*/, '')
@@ -83,7 +75,7 @@ function jcbCleanName(prefix) {
     .trim();
 }
 
-function jcbParseContacts(rawText) {
+function jcbParseBatch(rawText) {
   const text = jcbStripCommand(rawText);
   const lines = text.split(/\r?\n/).map(v => v.trim()).filter(Boolean);
   const contacts = [];
@@ -106,7 +98,7 @@ function jcbParseContacts(rawText) {
     }
 
     const phone = jcbFormatPhone(match);
-    const dedupeKey = `${name}\u0000${jcbNormalizePhone(phone)}`;
+    const dedupeKey = `${name}\u0000${phone.replace(/\D/g, '')}`;
     if (seen.has(dedupeKey)) continue;
     seen.add(dedupeKey);
     contacts.push({ name, phone });
@@ -119,173 +111,77 @@ function jcbParseContacts(rawText) {
   };
 }
 
-function jcbSilentAck(res, details = {}) {
-  // Do not return JANDI's { body: ... } response shape. This prevents
-  // Outgoing Webhook response messages from appearing in the configured JANDI room.
-  return res.status(200).json({ ok: true, ...details });
+function jcbCountPhoneCandidates(rawText) {
+  const text = String(rawText || '');
+  const matches = text.match(/(?<!\d)01[016789][\s-]?\d{3,4}[\s-]?\d{4}(?!\d)/g);
+  return matches ? matches.length : 0;
 }
 
-async function jcbPostIncoming(incomingUrl, body, color = '#BBCBCD') {
-  const response = await fetch(incomingUrl, {
+async function jcbCallUpstream(upstream, payload) {
+  const response = await fetch(upstream, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ body, connectColor: color }),
-    signal: AbortSignal.timeout(12_000),
+    body: JSON.stringify(payload),
+    redirect: 'follow',
+    signal: AbortSignal.timeout(20_000),
   });
-  if (!response.ok) {
-    throw new Error(`JANDI_INCOMING_${response.status}`);
-  }
-}
 
-async function jcbGetSheetsAccessToken() {
-  const email = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
-  const rawKey = process.env.GOOGLE_PRIVATE_KEY;
-  if (!email || !rawKey) {
-    throw new Error('GOOGLE_SHEETS_CREDENTIALS_MISSING');
-  }
-
-  const auth = new GoogleAuth({
-    credentials: {
-      client_email: email,
-      private_key: rawKey.replace(/\\n/g, '\n'),
-    },
-    scopes: ['https://www.googleapis.com/auth/spreadsheets'],
-  });
-  const client = await auth.getClient();
-  const tokenResult = await client.getAccessToken();
-  const token = typeof tokenResult === 'string' ? tokenResult : tokenResult?.token;
-  if (!token) throw new Error('GOOGLE_SHEETS_TOKEN_FAILED');
-  return token;
-}
-
-async function jcbSheetsRequest(token, path, options = {}) {
-  const response = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${JCB_SPREADSHEET_ID}${path}`,
-    {
-      ...options,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-      },
-      signal: AbortSignal.timeout(15_000),
-    },
-  );
   const text = await response.text();
-  let data = null;
-  try { data = text ? JSON.parse(text) : {}; } catch (_) { data = { raw: text }; }
-  if (!response.ok) {
-    const message = data?.error?.message || `Google Sheets API ${response.status}`;
-    throw new Error(message);
-  }
-  return data;
+  let parsed = null;
+  try { parsed = JSON.parse(text); } catch (_) {}
+  return {
+    ok: response.ok,
+    status: response.status,
+    body: parsed && typeof parsed.body === 'string' ? parsed.body : text.trim(),
+    json: parsed,
+  };
 }
 
-async function jcbReadManualContacts(token) {
-  const encoded = encodeURIComponent(JCB_MANUAL_RANGE);
-  const data = await jcbSheetsRequest(
-    token,
-    `/values/${encoded}?majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE`,
+async function jcbMapWithConcurrency(items, concurrency, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+
+  async function worker() {
+    while (true) {
+      const index = next++;
+      if (index >= items.length) return;
+      try {
+        results[index] = await fn(items[index], index);
+      } catch (error) {
+        results[index] = {
+          ok: false,
+          status: 0,
+          body: error?.message || 'upstream_error',
+          json: null,
+        };
+      }
+    }
+  }
+
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, () => worker()),
   );
-  const values = Array.isArray(data.values) ? data.values : [];
-  const headerName = String(values[0]?.[0] || '').trim();
-  const headerPhone = String(values[0]?.[1] || '').trim();
-  if (headerName !== '학생명(수동입력키)' || headerPhone !== '전화번호') {
-    throw new Error('CONTACT_SHEET_HEADER_MISMATCH');
-  }
-  return values;
+  return results;
 }
 
-async function jcbAppendContacts(token, contacts) {
-  if (!contacts.length) return null;
-  const encoded = encodeURIComponent(JCB_MANUAL_RANGE);
-  return jcbSheetsRequest(
-    token,
-    `/values/${encoded}:append?valueInputOption=USER_ENTERED&insertDataOption=OVERWRITE&includeValuesInResponse=true`,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        majorDimension: 'ROWS',
-        values: contacts.map(contact => [contact.name, contact.phone]),
-      }),
-    },
-  );
-}
-
-function jcbExistingPairSet(values) {
-  const set = new Set();
-  for (const row of values.slice(1)) {
-    const name = String(row?.[0] || '').trim();
-    const phone = jcbNormalizePhone(row?.[1]);
-    if (name && phone) set.add(`${name}\u0000${phone}`);
-  }
-  return set;
-}
-
-function jcbSafeErrorCode(error) {
-  const msg = String(error?.message || error || 'UNKNOWN');
-  if (/permission|forbidden|403/i.test(msg)) return 'SHEET_PERMISSION';
-  if (/header/i.test(msg)) return 'SHEET_HEADER';
-  if (/credential|token/i.test(msg)) return 'GOOGLE_AUTH';
-  if (/JANDI_INCOMING/i.test(msg)) return 'JANDI_INCOMING';
-  return 'SAVE_FAILED';
+function jcbSilentAck(res, details = {}) {
+  // Deliberately do not return JANDI's { body: ... } response shape.
+  // JANDI therefore does not create an Outgoing-Webhook response message.
+  // The existing Apps Script posts the user-visible result to the intended
+  // room through its already-configured Incoming Webhook.
+  return res.status(200).json({ ok: true, ...details });
 }
 
 async function handleJandiContactBatch(req, res) {
   const key = jcbAuthorized(req);
   if (!key) return res.status(401).json({ error: 'Unauthorized' });
 
-  let incomingUrl;
-  try {
-    incomingUrl = jcbDecryptIncomingUrl(key);
-  } catch (error) {
-    console.error('jandi-contact incoming decrypt failed', error);
-    return res.status(500).json({ error: 'incoming_config_error' });
-  }
-
   if (req.method === 'GET') {
-    if (jcbAsString(req.query?.notify) === '1') {
-      try {
-        await jcbPostIncoming(
-          incomingUrl,
-          '✅ /연락처 저장결과 전용 Webhook 연결이 완료되었습니다.',
-          '#2ECC71',
-        );
-        return res.status(200).json({ ok: true, notificationSent: true });
-      } catch (error) {
-        console.error('jandi-contact notify test failed', error);
-        return res.status(502).json({ ok: false, error: jcbSafeErrorCode(error) });
-      }
-    }
-
-    if (jcbAsString(req.query?.diagnostic) === '1') {
-      try {
-        const token = await jcbGetSheetsAccessToken();
-        const values = await jcbReadManualContacts(token);
-        return res.status(200).json({
-          ok: true,
-          service: 'jandi-contact-direct-save',
-          sheetAccess: true,
-          existingRows: Math.max(0, values.length - 1),
-          incomingConfigured: true,
-        });
-      } catch (error) {
-        console.error('jandi-contact diagnostic failed', error);
-        return res.status(200).json({
-          ok: false,
-          service: 'jandi-contact-direct-save',
-          sheetAccess: false,
-          incomingConfigured: true,
-          error: jcbSafeErrorCode(error),
-        });
-      }
-    }
-
     return res.status(200).json({
       ok: true,
-      service: 'jandi-contact-direct-save',
+      service: 'jandi-contact-batch',
       maxContacts: JCB_MAX_CONTACTS,
-      responseMode: 'silent-outgoing-dedicated-incoming-confirmation',
+      responseMode: 'silent-outgoing-existing-incoming-confirmation',
     });
   }
 
@@ -301,85 +197,83 @@ async function handleJandiContactBatch(req, res) {
   const rawText = dataText || jcbStripCommand(fullText);
 
   if (keyword && keyword !== '연락처') {
-    return jcbSilentAck(res, { ignored: true, reason: 'wrong_keyword' });
+    return res.status(400).json({ error: 'wrong_keyword' });
   }
 
-  const { contacts, skipped, truncated } = jcbParseContacts(rawText || fullText);
+  let upstream;
+  try {
+    upstream = jcbDecryptUpstream(key);
+  } catch (error) {
+    console.error('jandi-contact-batch upstream decrypt failed', error);
+    return res.status(500).json({ error: 'upstream_config_error' });
+  }
+
+  const candidateCount = jcbCountPhoneCandidates(rawText || fullText);
+
+  // 0~1건: 현재 Apps Script에 원문 그대로 전달한다.
+  // 사용자에게 보이는 성공/오류 메시지는 Apps Script의 기존 Incoming Webhook이 담당한다.
+  if (candidateCount <= 1) {
+    try {
+      const upstreamResult = await jcbCallUpstream(upstream, payload);
+      if (!upstreamResult.ok) {
+        console.error('jandi-contact-batch single upstream error', upstreamResult.status, upstreamResult.body);
+      }
+      return jcbSilentAck(res, {
+        processed: 1,
+        upstreamOk: upstreamResult.ok,
+      });
+    } catch (error) {
+      console.error('jandi-contact-batch single passthrough failed', error);
+      return res.status(502).json({ error: 'upstream_call_failed' });
+    }
+  }
+
+  const { contacts, skipped, truncated } = jcbParseBatch(rawText || fullText);
 
   if (!contacts.length) {
+    // 기존 Apps Script가 기존 방식대로 안내문을 Incoming Webhook으로 보내도록 원문 전달.
     try {
-      await jcbPostIncoming(
-        incomingUrl,
-        '⚠️ 이름과 010 전화번호를 찾지 못했습니다. 예: /연락처 김민수 010-1234-5678',
-        '#E67E22',
-      );
-    } catch (error) {
-      console.error('jandi-contact invalid-input notification failed', error);
-    }
-    return jcbSilentAck(res, { processed: 0, skipped: skipped.length });
-  }
-
-  try {
-    const token = await jcbGetSheetsAccessToken();
-    const existingValues = await jcbReadManualContacts(token);
-    const existingPairs = jcbExistingPairSet(existingValues);
-
-    const newContacts = [];
-    const duplicateContacts = [];
-    for (const contact of contacts) {
-      const pair = `${contact.name}\u0000${jcbNormalizePhone(contact.phone)}`;
-      if (existingPairs.has(pair)) {
-        duplicateContacts.push(contact);
-      } else {
-        newContacts.push(contact);
-        existingPairs.add(pair);
+      const upstreamResult = await jcbCallUpstream(upstream, payload);
+      if (!upstreamResult.ok) {
+        console.error('jandi-contact-batch fallback upstream error', upstreamResult.status, upstreamResult.body);
       }
+      return jcbSilentAck(res, {
+        processed: 1,
+        fallback: true,
+        upstreamOk: upstreamResult.ok,
+      });
+    } catch (error) {
+      console.error('jandi-contact-batch fallback failed', error);
+      return res.status(502).json({ error: 'upstream_call_failed' });
     }
-
-    const appendResult = await jcbAppendContacts(token, newContacts);
-    const updatedRange = appendResult?.updates?.updatedRange || '';
-
-    const report = [];
-    if (newContacts.length) {
-      report.push(`✅ 연락처 ${newContacts.length}건 저장 완료`);
-      report.push(...newContacts.map(contact => `${contact.name} ${contact.phone}`));
-    } else {
-      report.push('✅ 새로 저장할 연락처가 없습니다.');
-    }
-    if (duplicateContacts.length) {
-      report.push(`↩️ 이미 등록된 동일 연락처 ${duplicateContacts.length}건은 건너뛰었습니다.`);
-    }
-    if (skipped.length) {
-      report.push(`⚠️ 인식하지 못한 줄 ${skipped.length}건`);
-    }
-    if (truncated) {
-      report.push(`⚠️ 한 번에 최대 ${JCB_MAX_CONTACTS}건까지만 처리했습니다.`);
-    }
-
-    await jcbPostIncoming(incomingUrl, report.join('\n'), '#2ECC71');
-
-    return jcbSilentAck(res, {
-      processed: contacts.length,
-      saved: newContacts.length,
-      duplicates: duplicateContacts.length,
-      skipped: skipped.length,
-      truncated,
-      updatedRange,
-    });
-  } catch (error) {
-    const safeCode = jcbSafeErrorCode(error);
-    console.error('jandi-contact direct save failed', safeCode, error);
-    try {
-      await jcbPostIncoming(
-        incomingUrl,
-        `⚠️ 연락처 저장에 실패했습니다. 운영 확인 코드: ${safeCode}`,
-        '#E74C3C',
-      );
-    } catch (notifyError) {
-      console.error('jandi-contact failure notification failed', notifyError);
-    }
-    return jcbSilentAck(res, { processed: contacts.length, saved: 0, error: safeCode });
   }
+
+  const results = await jcbMapWithConcurrency(contacts, 3, async contact => {
+    const oneLine = `${contact.name} ${contact.phone}`;
+    const forwarded = {
+      ...payload,
+      keyword: payload.keyword || '연락처',
+      text: `/연락처 ${oneLine}`,
+      data: oneLine,
+    };
+    return jcbCallUpstream(upstream, forwarded);
+  });
+
+  const failed = results.filter(result => !result?.ok).length;
+  if (failed) {
+    console.error('jandi-contact-batch partial upstream failures', {
+      total: contacts.length,
+      failed,
+      statuses: results.map(r => r?.status || 0),
+    });
+  }
+
+  return jcbSilentAck(res, {
+    processed: contacts.length,
+    failed,
+    skipped: skipped.length,
+    truncated,
+  });
 }
 
 async function getSheetSummary() {
