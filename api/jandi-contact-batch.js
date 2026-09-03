@@ -51,8 +51,7 @@ function normalizePayloadBody(req) {
 
 function stripCommand(text) {
   return String(text || '')
-    .replace(/^\s*\/\s*연락처\b\s*/i, '')
-    .replace(/^\s*\/연락처\b\s*/i, '')
+    .replace(/^\s*\/\s*연락처(?:\s+|$)/i, '')
     .trim();
 }
 
@@ -64,8 +63,8 @@ function formatPhone(groups) {
 function cleanName(prefix) {
   return String(prefix || '')
     .replace(/^\s*(?:[-*•·]|\d+[.)])\s*/, '')
-    .replace(/^\s*\/\s*연락처\s*/i, '')
-    .replace(/^\s*\/연락처\s*/i, '')
+    .replace(/^\s*\/\s*연락처(?:\s+|$)/i, '')
+    .replace(/^[\s'"“”‘’]+|[\s'"“”‘’]+$/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
